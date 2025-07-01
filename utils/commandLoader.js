@@ -14,8 +14,10 @@ const devDir = './commands/dev/';
 function unloadCommand(file, filePath, targetMap) {
 	// Delete command from require memory
 	try {
-		delete require.cache(require.resolve(filePath));
-	} catch {
+		//console.log(`Trying to delete ${filePath} module from cache`);
+		delete require.cache[require.resolve(filePath)];
+	} catch (err) {
+		console.log(err);
 		// just means didn't need reloading
 	}
 
@@ -26,7 +28,8 @@ function unloadCommand(file, filePath, targetMap) {
 function loadCommand(file, dir) {
 	const targetMap = dir == devDir ? commands.dev : commands.public;
 	const filePath = path.resolve(path.join(dir, file));
-	console.log(filePath);
+	console.log(filePath, file, dir);
+
 	unloadCommand(file, filePath, targetMap);
 
 	const name = file.replace('.js', ''); // Command name instead of plain filename

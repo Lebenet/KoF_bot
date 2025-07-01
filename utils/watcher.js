@@ -5,6 +5,11 @@ const path = require('node:path');
 const { initLoad, unloadCommand, loadCommand, sendCommands, getCommands, getGuildCommands } = require('./commandLoader.js');
 const { loadConfig, addSingleConfig, /* updateSingleConfig, deleteSingleConfig, */ getConfig, lockBot, unlockBot } = require('./configLoader.js');
 
+const folders = {
+	'commands\\dev\\': './commands/dev/',
+	'commands\\public\\': './commands/public/',
+};
+
 async function configWatcher() {}
 
 async function commandWatcher() {}
@@ -48,8 +53,8 @@ function start() {
 				return;
 			}
 
-			const guild_id = dir == 'commands\\dev\\' ? process.env.DEV_GUILD_ID : process.env.GUILD_ID;
-			loadCommand(file, dir);
+			const guild_id = dir == 'commands\\public\\' ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
+			loadCommand(file, folders[dir]);
 			sendCommands(guild_id);
 			console.log(getCommands());
 
@@ -68,8 +73,8 @@ function start() {
 				return;
 			}
 
-			const guild_id = dir == 'commands\\dev\\' ? process.env.DEV_GUILD_ID : process.env.GUILD_ID;
-			loadCommand(file, dir);
+			const guild_id = dir == 'commands\\public\\' ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
+			loadCommand(file, folders[dir]);
 			sendCommands(guild_id);
 			console.log(getCommands());
 
@@ -88,7 +93,7 @@ function start() {
 				return;
 			}
 
-			const guild_id = dir == 'commands\\dev\\' ? process.env.DEV_GUILD_ID : process.env.GUILD_ID;
+			const guild_id = dir == 'commands\\public\\' ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
 			unloadCommand(file, filePath, getGuildCommands(guild_id));
 			sendCommands(guild_id);
 			console.log(getCommands());

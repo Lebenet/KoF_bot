@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 
 async function ping(interaction, _config) {
-	
+	await interaction.reply('Pong! dev');
 }
 
 module.exports = {
@@ -9,7 +9,5 @@ module.exports = {
 		.setName('ping')
 		.setDescription('pong'),
 
-	async execute(interaction, config) {
-		await interaction.reply('Pong!');
-	}
+	execute: ping
 };

@@ -11,8 +11,6 @@ Requires bot admin
 
 async function publish(interaction, config) {
 	try {
-		console.log(`admins:  ${config.admins}`);
-		console.log(`user_id: ${interaction.user.id}`);
 		// Check user has sufficient permissions
 		if (!config.admins.includes(interaction.member.user.id)){
 			await interaction.reply(`Only bot admins can use this command.`);
