@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 const { start } = require('./utils/watcher.js');
-const { getCommands } = require('./utils/commandLoader.js');
+const { getCommands, getGuildCommands } = require('./utils/commandLoader.js');
 const { getConfig } = require('./utils/configLoader.js');
 
 // Load discord bot token from .env
@@ -25,10 +25,14 @@ start();
 // Handle commands
 client.on(Events.InteractionCreate, async interaction => {
     const config = getConfig();
-    if (!interaction.isChatInputCommand() || config.locked)
+    if (!interaction.isChatInputCommand())
         return;
+    if (config.locked){
+        await interaction.reply('Bot is reloading this command.');
+        return;
+    }
     
-    const command = getCommands().get(interaction.commandName);
+    const command = getGuildCommands(interaction.guildId).get(interaction.commandName);
 
     if (!command) {
         console.error(`No ${interaction.commandName} command found.`);

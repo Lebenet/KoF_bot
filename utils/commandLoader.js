@@ -2,27 +2,32 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { REST, Routes } = require('discord.js');
-const { PassThrough } = require('node:stream');
 
 // Dynamically loaded commands
-const commands = new Map();
+const commands = {
+	public: new Map(),
+	dev: new Map(),
+};
+const publicDir = './commands/public/';
+const devDir = './commands/dev/';
 
-function unloadCommand(file, filePath) {
+function unloadCommand(file, filePath, targetMap) {
 	// Delete command from require memory
 	try {
 		delete require.cache(require.resolve(filePath));
 	} catch {
-		PassThrough; // just means didn't need reloading
+		// just means didn't need reloading
 	}
 
 	// Delete command from map
-	commands.delete(file.replace('.js', ''));
+	targetMap.delete(file.replace('.js', ''));
 }
 
-function loadCommand(file) {
-	const filePath = path.resolve(path.join('commands', file));
+function loadCommand(file, dir) {
+	const targetMap = dir == devDir ? commands.dev : commands.public;
+	const filePath = path.resolve(path.join(dir, file));
 	console.log(filePath);
-	unloadCommand(file, filePath);
+	unloadCommand(file, filePath, targetMap);
 
 	const name = file.replace('.js', ''); // Command name instead of plain filename
 
@@ -32,7 +37,7 @@ function loadCommand(file) {
 
 		if ('data' in command && 'execute' in command) {
 			// Load command to map
-			commands.set(command.data.name, command);
+			targetMap.set(command.data.name, command);
 		} else {
 			console.warn(`[HOT-RELOAD] | [WARN] Command ${name} missing "data" or "execute" fields.`);
 		}
@@ -42,25 +47,31 @@ function loadCommand(file) {
 	}
 }
 function initLoad() {
-	const commandFiles = fs.readdirSync('./commands/')
-		.filter(file => file.endsWith('.js'));
+	// Load public commands
+	fs.readdirSync(publicDir)
+		.filter(file => file.endsWith('.js'))
+		.forEach(file => loadCommand(file, publicDir));
 
-	commandFiles.forEach(file => loadCommand(file));
+	// Load dev commands
+	fs.readdirSync(devDir)
+		.filter(file => file.endsWith('.js'))
+		.forEach(file => loadCommand(file, devDir));
 }
 
 const getCommands = () => commands;
-const getCommandsArray = () => [...commands.values()].map(cmd => cmd.data.toJSON());
+const getGuildCommands = (guild_id) => guild_id == process.env.DEV_GUILD_ID ? commands.dev : commands.public;
+const getCommandsArray = (cmds) => [...cmds.values()].map(cmd => cmd.data.toJSON());
 
 // Set REST API
 const rest = new REST().setToken(process.env.BOT_TOKEN);
 
 // Sends slash commands to discord
-async function sendCommands() {
+async function sendCommands(guild_id) {
 	try {
 		console.log('Started refreshing application (/) commands.');
 
-		await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-			{ body: getCommandsArray() });
+		await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guild_id),
+			{ body: getCommandsArray(getGuildCommands(guild_id)) });
 
 		console.log('Successfully reloaded application (/) commands.');
 	} catch (err) {
@@ -75,4 +86,5 @@ module.exports = {
 	getCommands,
 	getCommandsArray,
 	sendCommands,
+	getGuildCommands,
 };
