@@ -3,19 +3,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { initLoad, unloadCommand, loadCommand, sendCommands, getCommands, getGuildCommands } = require('./commandLoader.js');
-const { loadConfig, addSingleConfig, /* updateSingleConfig, deleteSingleConfig, */ getConfig, lockBot, unlockBot } = require('./configLoader.js');
+const { loadConfig, addSingleConfig, /* updateSingleConfig, deleteSingleConfig, */ getConfig, lockBot, unlockBot, deleteSingleConfig } = require('./configLoader.js');
 
 const folders = {
 	'commands\\dev\\': './commands/dev/',
 	'commands\\public\\': './commands/public/',
 };
 
-async function configWatcher() {}
-
-async function commandWatcher() {}
-
-function getFileDir(filePath) {
-	const file = filePath.split('\\')[2];
+async function getFileDir(filePath) {
+	const file = filePath.split('\\').at(-1);
 	const dir = filePath.replace(file, '');
 	return { file, dir };
 }
@@ -36,20 +32,26 @@ function start() {
 	// sendCommands(process.env.GUILD_ID);
 
 	// TODO: Watcher
-	const watcher = chokidar.watch(['./commands/public/', './commands/dev/'], {
+	const watcherCmd = chokidar.watch(['./commands/public/', './commands/dev/'], {
 		persistent: true,																// runs as long as the bot is up
 		ignoreInitial: true,															// ignore initial files
 		ignored: (filePath, stats) => stats?.isFile() && !filePath.endsWith('.js'),		// only watch .js files
 	});
 
-	watcher
-		.on('add', filePath => {
+	const watcherCfg = chokidar.watch('./data/', {
+		persistent: true,
+		ignoreInitial: true,
+		ignored: (filePath, stats) => stats?.isFile() && !filePath.endsWith('.json'),
+	})
+;
+	watcherCmd
+		.on('add', async filePath => {
 			// Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
-			config.locked = true;
+			lockBot();
 
-			const { file, dir } = getFileDir(filePath);
+			const { file, dir } = await getFileDir(filePath);
 			if (!file || !dir) {
-				console.error(`[ERROR] | Watcher add: failed to extract filename and dir from filePath: ${filePath}`);
+				console.error(`[ERROR] | WatcherCmd add: failed to extract filename and dir from filePath: ${filePath}`);
 				return;
 			}
 
@@ -61,15 +63,15 @@ function start() {
 			console.log(`[WATCHER] | Added: ${filePath}`);
 
 			// Unlock bot once hot-reload is complete
-			config.locked = false;
+			unlockBot();
 		})
-		.on('change', filePath => {
+		.on('change', async filePath => {
 			// Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
-			config.locked = true;
+			lockBot();
 
-			const { file, dir } = getFileDir(filePath);
+			const { file, dir } = await getFileDir(filePath);
 			if (!file || !dir) {
-				console.error(`[ERROR] | Watcher change: failed to extract filename and dir from filePath: ${filePath}`);
+				console.error(`[ERROR] | WatcherCmd change: failed to extract filename and dir from filePath: ${filePath}`);
 				return;
 			}
 
@@ -81,15 +83,15 @@ function start() {
 			console.log(`[WATCHER] | Changed: ${filePath}`);
 
 			// Unlock bot once hot-reload is complete
-			config.locked = false;
+			unlockBot();
 		})
-		.on('unlink', filePath => {
+		.on('unlink', async filePath => {
 			// Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
-			config.locked = true;
+			lockBot();
 
-			const { file, dir } = getFileDir(filePath);
+			const { file, dir } = await getFileDir(filePath);
 			if (!file || !dir) {
-				console.error(`[ERROR] | Watcher unlink: failed to extract filename and dir from filePath: ${filePath}`);
+				console.error(`[ERROR] | WatcherCmd unlink: failed to extract filename and dir from filePath: ${filePath}`);
 				return;
 			}
 
@@ -101,7 +103,51 @@ function start() {
 			console.log(`[WATCHER] | Unlinked: ${filePath}`);
 
 			// Unlock bot once hot-reload is complete
-			config.locked = false;
+			unlockBot();
+		});
+
+	watcherCfg
+		.on('add', async filePath => {
+			lockBot();
+
+			const { file, dir } = await getFileDir(filePath);
+			if (!file || !dir) {
+				console.error(`[ERROR] | WatcherCfg add: failed to extract filename and dir from filePath: ${filePath}`);
+				return;
+			}
+
+			addSingleConfig(file);
+			console.log(getConfig());
+
+			unlockBot();
+		})
+		.on('change', async filePath => {
+			lockBot();
+
+			const { file, dir } = await getFileDir(filePath);
+			if (!file || !dir) {
+				console.error(`[ERROR] | WatcherCfg change: failed to extract filename and dir from filePath: ${filePath}`);
+				return;
+			}
+
+			addSingleConfig(file);
+			console.log(getConfig());
+
+			unlockBot();
+		})
+		.on('unlink', async filePath => {
+			lockBot();
+
+			const { file, dir } = await getFileDir(filePath);
+			if (!file || !dir) {
+				console.error(`[ERROR] | WatcherCfg unlink: failed to extract filename and dir from filePath: ${filePath}`);
+				return;
+			}
+
+			deleteSingleConfig(file);
+			console.log(getConfig());
+
+			unlockBot();
 		});
 }
 

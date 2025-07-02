@@ -1,7 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { exit } = require('node:process');
-const { parse, stringify } = require('lossless-json');
 
 /*
 // Files to read
@@ -55,6 +54,17 @@ function addSingleConfig(fileName) {
 		config[key] = JSON.parse(raw);
 	} catch (err) {
 		throw new Error(`[HOT-RELOAD] Failed to load new config ${fileName}: ${err.message}`);
+		// FIXME: implement reloading old data
+	}
+}
+
+function deleteSingleConfig(fileName) {
+	try {
+		// Delete entry from config
+		const key = fileName.replace('.json', '');
+		delete config[key];
+	} catch (err) {
+		console.log(`[ERROR] | [CONFIG] Failed to remove config file from config:\n`, err);
 	}
 }
 
@@ -75,7 +85,7 @@ module.exports = {
 	loadConfig,
 	addSingleConfig,
 	//updateSingleConfig,
-	//deleteSingleConfig,
+	deleteSingleConfig,
 	getConfig,
 	lockBot,
 	unlockBot,
