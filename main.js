@@ -46,7 +46,14 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         // Get the correct command using guildId and the command name
-        const command = getGuildCommands(interaction.guildId).get(interaction.commandName);
+	const commands = getGuildCommands(interaction.guildId);
+	if (commands.size === 0) {
+		console.warn(`[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username (interaction.user.id)}.`);
+		await handleDeferredReply(interaction, 'Warning: This guild is not authorized to operate this application. Please contact `lebenet` on Discord if you think this is a mistake.', MessageFlags.Ephemeral);
+		return;
+	}
+
+	const command = commands.get(interaction.commandName);
 
         if (!command) {
             console.error(`No ${interaction.commandName} command found.`);
@@ -75,7 +82,20 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         // Handle modal submit
-        console.log('received modal');
+	const elms = interaction.customId.split('|');
+	
+	const guildId = elms[0];
+	interaction.guildId = guildId;
+	const command = getGuildCommands(guildId).get(interaction.commandName);
+        
+	const handlerName = elms[3];
+	try {
+		command[handlerName](interaction, config);
+	} catch (err) {
+		console.error(`[EXECUTE] An error occured:\n`, err);
+		await handleDeferredReply(interaction, 'An error occured while executing this command.', MessageFlags.Ephemeral);
+	}
+	//console.log('received modal');
     }
 
     // Button click
@@ -93,5 +113,18 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         // Handle other buttons
+	const elms = interaction.customId.split('|');
+	
+	const guildId = elms[0];
+	interaction.guildId = guildId;
+	const command = getGuildCommands(guildId).get(interaction.commandName);
+        
+	const handlerName = elms[3];
+	try {
+		command[handlerName](interaction, config);
+	} catch (err) {
+		console.error(`[EXECUTE] An error occured:\n`, err);
+		await handleDeferredReply(interaction, 'An error occured while executing this command.', MessageFlags.Ephemeral);
+	}
     }
 });

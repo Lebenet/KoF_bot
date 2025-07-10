@@ -26,13 +26,16 @@ function unloadCommand(file, filePath, targetMap) {
 }
 
 function loadCommand(file, dir) {
-	const targetMap = dir == devDir ? commands.dev : commands.public;
+	const targetMap = dir == devDir ? commands.dev : dir == publicDir ? commands.public : undefined;
+	const name = file.replace('.js', ''); // Command name instead of plain filename
+
+	if (!targetMap) {
+		console.warn(`[WARNING] | HOT-RELOAD: Failed to load command ${name}, dir ${dir} unknown.`);
+	}
 	const filePath = path.resolve(path.join(dir, file));
 	console.log(filePath, file, dir);
 
 	unloadCommand(file, filePath, targetMap);
-
-	const name = file.replace('.js', ''); // Command name instead of plain filename
 
 	try {
 		// Load command to require memory
@@ -62,23 +65,35 @@ function initLoad() {
 }
 
 const getCommands = () => commands;
-const getGuildCommands = (guild_id) => guild_id == process.env.DEV_GUILD_ID ? commands.dev : commands.public;
+
+const getGuildCommands = (guildId) => {
+	switch (guildId) {
+		case process.env.DEV_GUILD_ID:
+			return commands.dev;
+		case process.env.GUILD_ID:
+			return commands.public;
+		default:
+			console.warn('[WARN] | Member of an unauthorized server tried to execute a command. Guild ID: ${guildId}');
+			return new Map();
+	}
+}
+
 const getCommandsArray = (cmds) => [...cmds.values()].map(cmd => cmd.data.toJSON());
 
 // Set REST API
 const rest = new REST().setToken(process.env.BOT_TOKEN);
 
 // Sends slash commands to discord
-async function sendCommands(guild_id) {
+async function sendCommands(guildId) {
 	try {
 		console.log('Started refreshing application (/) commands.');
 
-		await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guild_id),
-			{ body: getCommandsArray(getGuildCommands(guild_id)) });
+		await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
+			{ body: getCommandsArray(getGuildCommands(guildId)) });
 
 		console.log('Successfully reloaded application (/) commands.');
 	} catch (err) {
-		console.error(err);
+		console.error(`[ERROR] | [HOT-RELOAD]: Failed to update guild commands for Guild ID ${guildId}: \n`, err);
 	}
 }
 
