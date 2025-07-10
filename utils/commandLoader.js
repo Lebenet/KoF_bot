@@ -64,20 +64,18 @@ function initLoad() {
 		.forEach(file => loadCommand(file, devDir));
 }
 
-const getCommands = () => commands;
-
 const getGuildCommands = (guildId) => {
 	switch (guildId) {
-		case process.env.DEV_GUILD_ID:
-			return commands.dev;
-		case process.env.GUILD_ID:
-			return commands.public;
+		case process.env.DEV_GUILD_ID: return commands.dev;
+		case process.env.GUILD_ID: return commands.public;
 		default:
 			console.warn('[WARN] | Member of an unauthorized server tried to execute a command. Guild ID: ${guildId}');
 			return new Map();
 	}
 }
 
+const getCommands = () => commands;
+const getSlashCommands = (cmds) => cmds.filter(c => typeof c.execute === 'funtion');
 const getCommandsArray = (cmds) => [...cmds.values()].map(cmd => cmd.data.toJSON());
 
 // Set REST API
@@ -89,7 +87,7 @@ async function sendCommands(guildId) {
 		console.log('Started refreshing application (/) commands.');
 
 		await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
-			{ body: getCommandsArray(getGuildCommands(guildId)) });
+			{ body: getCommandsArray(getSlashCommands(getGuildCommands(guildId))) } );
 
 		console.log('Successfully reloaded application (/) commands.');
 	} catch (err) {
@@ -102,7 +100,8 @@ module.exports = {
 	unloadCommand,
 	loadCommand,
 	getCommands,
+	getSlashCommands,
 	getCommandsArray,
-	sendCommands,
 	getGuildCommands,
+	sendCommands,
 };

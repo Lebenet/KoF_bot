@@ -20,7 +20,7 @@
   "dependencies": {
     "chokidar": "^4.0.3",
     "discord.js": "^14.21.0",
-    "dotenv": "^17.0.0",
+    "dotenv": "^17.2.0",
     "lossless-json": "^4.1.1"
   },
   "devDependencies": {

@@ -3,9 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 const { start } = require('./utils/watcher.js');
-const { getCommands, getGuildCommands } = require('./utils/commandLoader.js');
+const { getSlashCommands, getGuildCommands } = require('./utils/commandLoader.js');
 const { getConfig } = require('./utils/configLoader.js');
-const { getModals, saveModalData, rebuildModals, waitForUnlock, resendModal } = require('./utils/modalSaver.js');
+const { saveModalData, waitForUnlock, resendModal } = require('./utils/modalSaver.js');
 
 // Load discord bot token from .env
 require('dotenv').config();
@@ -22,8 +22,6 @@ client.login(token);
 
 // Start watcher
 start();
-
-
 
 async function handleDeferredReply(interaction, content, flags) {
     if (interaction.replied || interaction.deferred) {
@@ -46,14 +44,14 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         // Get the correct command using guildId and the command name
-	const commands = getGuildCommands(interaction.guildId);
-	if (commands.size === 0) {
-		console.warn(`[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username (interaction.user.id)}.`);
-		await handleDeferredReply(interaction, 'Warning: This guild is not authorized to operate this application. Please contact `lebenet` on Discord if you think this is a mistake.', MessageFlags.Ephemeral);
-		return;
-	}
+        const commands = getSlashCommands(getGuildCommands(interaction.guildId));
+        if (commands.size === 0) {
+            console.warn(`[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username (interaction.user.id)}.`);
+            await handleDeferredReply(interaction, 'Warning: This guild is not authorized to operate this application. Please contact `lebenet` on Discord if you think this is a mistake.', MessageFlags.Ephemeral);
+            return;
+	    }
 
-	const command = commands.get(interaction.commandName);
+	    const command = commands.get(interaction.commandName);
 
         if (!command) {
             console.error(`No ${interaction.commandName} command found.`);
@@ -73,7 +71,7 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isModalSubmit()) {
         // Make sure that nothing happens in the few milliseconds while reloading, but also saves the user input
         if (config.locked) {
-            saveModalData(interaction);
+            saveModalData(interaction); // Maybe move WaitForUnlock call inside this function
             await handleDeferredReply(interaction, 'Bot is reloading, your form data has been saved.\n Bot will DM you when it\'s finished.', MessageFlags.Ephemeral);
 
             // call a watcher to resend forms after unlock
