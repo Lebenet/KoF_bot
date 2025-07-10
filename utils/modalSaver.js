@@ -60,11 +60,13 @@ async function rebuildModals(users) {
 
 async function resendModal(interaction) {
 	try {
-		const modal = savedModals.get(interaction.customId.replace('resend_modal:', ''));
+		const modalId = interaction.customId.replace('resend_modal:', '');
+		const modal = savedModals.get(modalId);
 
 		// Resend modal to the user and delete recovery button
 		await interaction.message.delete();
 		await interaction.showModal(modal);
+		savedModals.delete(modalId);
 	} catch {
 		console.error(`[ERROR] | [HOT-RELOAD] Saver has failed to send form back to user ${interaction.user.username}`);
 	}
