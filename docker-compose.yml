@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: kof-bot:latest
     container_name: kof-bot
     environment:
       - CHOKIDAR_USEPOLLING=true
