@@ -1,6 +1,6 @@
 const chokidar = require('chokidar');
 const fs = require('node:fs');
-// const path = require('node:path');
+const path = require('node:path');
 
 const { initLoad, unloadCommand, loadCommand, sendCommands, getCommands, getGuildCommands } = require('./commandLoader.js');
 const { loadConfig, addSingleConfig, /* updateSingleConfig, deleteSingleConfig, */ getConfig, lockBot, unlockBot, deleteSingleConfig } = require('./configLoader.js');
