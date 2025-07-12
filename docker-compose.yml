@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  kof-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kof-bot
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - .:/usr/src/bot
+    restart: unless-stopped

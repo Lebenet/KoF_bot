@@ -6,15 +6,18 @@ const { initLoad, unloadCommand, loadCommand, sendCommands, getCommands, getGuil
 const { loadConfig, addSingleConfig, /* updateSingleConfig, deleteSingleConfig, */ getConfig, lockBot, unlockBot, deleteSingleConfig } = require('./configLoader.js');
 
 const folders = {
-	'commands\\dev\\': './commands/dev/',
-	'commands\\public\\': './commands/public/',
+	[path.join('commands', 'dev')]: './commands/dev/',
+	[path.join('commands', 'public')]: './commands/public/',
 };
 
 async function getFileDir(filePath) {
-	const file = filePath.split('\\').at(-1);
-	const dir = filePath.replace(file, '');
+	const file = path.basename(filePath);
+	const dir = path.dirname(filePath);
+	console.log(file, dir); // FIXME: TO TEST
 	return { file, dir };
 }
+
+const getGuildId = (dir) => dir.endsWith(path.join('commands', 'public')) ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
 
 function start() {
 	// Ensure that config folder exists
@@ -36,19 +39,23 @@ function start() {
 	sendCommands(process.env.DEV_GUILD_ID);
 	// sendCommands(process.env.GUILD_ID);
 
-	// TODO: Watcher
+	// TODO: Routines (& other) Watcher
 	const watcherCmd = chokidar.watch(['./commands/public/', './commands/dev/'], {
 		persistent: true,																// runs as long as the bot is up
 		ignoreInitial: true,															// ignore initial files
 		ignored: (filePath, stats) => stats?.isFile() && !filePath.endsWith('.js'),		// only watch .js files
+		usePolling: process.env.CHOKIDAR_USEPOLLING === 'true',
+  		interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 100, // ms
 	});
 
 	const watcherCfg = chokidar.watch('./data/', {
 		persistent: true,
 		ignoreInitial: true,
 		ignored: (filePath, stats) => stats?.isFile() && !filePath.endsWith('.json'),
-	})
-;
+		usePolling: process.env.CHOKIDAR_USEPOLLING === 'true',
+  		interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 100, // ms
+	});
+
 	watcherCmd
 		.on('add', async filePath => {
 			// Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
@@ -60,7 +67,7 @@ function start() {
 				return;
 			}
 
-			const guild_id = dir == 'commands\\public\\' ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
+			const guild_id = getGuildId(dir);
 			loadCommand(file, folders[dir]);
 			sendCommands(guild_id);
 			console.log(getCommands());
@@ -80,7 +87,7 @@ function start() {
 				return;
 			}
 
-			const guild_id = dir == 'commands\\public\\' ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
+			const guild_id = getGuildId(dir);
 			loadCommand(file, folders[dir]);
 			sendCommands(guild_id);
 			console.log(getCommands());
@@ -100,7 +107,7 @@ function start() {
 				return;
 			}
 
-			const guild_id = dir == 'commands\\public\\' ? process.env.GUILD_ID : process.env.DEV_GUILD_ID;
+			const guild_id = getGuildId(dir);
 			unloadCommand(file, filePath, getGuildCommands(guild_id));
 			sendCommands(guild_id);
 			console.log(getCommands());
