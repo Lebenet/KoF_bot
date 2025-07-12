@@ -86,7 +86,7 @@ async function sendCommands(guildId) {
 		console.log('Started refreshing application (/) commands.');
 
 		await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
-			{ body: getCommandsArray(getSlashCommands(getGuildCommands(guildId))) });
+			{ body: getSlashCommands(getCommandsArray(getGuildCommands(guildId))) });
 
 		console.log('Successfully reloaded application (/) commands.');
 	} catch (err) {
