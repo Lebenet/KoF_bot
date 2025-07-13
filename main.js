@@ -117,14 +117,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         // Handle modal submit
         const elms = interaction.customId.split("|");
+        const [guildId, commandName, handlerName] = elms;
+        const command = getGuildCommands(guildId).get(commandName);
 
-        const guildId = elms[0];
-        interaction.guildId = guildId;
-        const command = getGuildCommands(guildId).get(interaction.commandName);
+        // If saved modal resent to the user
+        if (!interaction.guildId)
+            // Reset guildId in case the handler needs it
+            interaction.guildId = guildId;
 
-        const handlerName = elms[3];
         try {
-            command[handlerName](interaction, config);
+            await command[handlerName](interaction, config);
         } catch (err) {
             console.error(`[EXECUTE] An error occured:\n`, err);
             await handleDeferredReply(
@@ -156,12 +158,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         // Handle other buttons
         const elms = interaction.customId.split("|");
+        const [guildId, commandName, handlerName] = elms;
+        const command = getGuildCommands(guildId).get(commandName);
 
-        const guildId = elms[0];
-        interaction.guildId = guildId;
-        const command = getGuildCommands(guildId).get(interaction.commandName);
-
-        const handlerName = elms[3];
         try {
             command[handlerName](interaction, config);
         } catch (err) {

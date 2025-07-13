@@ -6,7 +6,7 @@ const {
     ActionRowBuilder,
 } = require("discord.js");
 
-async function testmodal(interaction, config) {
+async function testmodal(interaction, _config) {
     await interaction.showModal(
         new ModalBuilder()
             .setCustomId("customid")
@@ -14,7 +14,7 @@ async function testmodal(interaction, config) {
             .addComponents(
                 new ActionRowBuilder().addComponents(
                     new TextInputBuilder()
-                        .setCustomId("testid")
+                        .setCustomId(`${interaction.guildId}|testmodal|testHandler`)
                         .setLabel("the test")
                         .setStyle(TextInputStyle.Short)
                         .setPlaceholder("a placeholder"),
@@ -31,4 +31,10 @@ module.exports = {
         ),
 
     execute: testmodal,
+    testHandler: async function (interaction, _config) {
+        if (interaction.replied || interaction.deferred)
+            interaction.editReply("Modal received");
+        else
+            interaction.reply("Modal received");
+    },
 };
