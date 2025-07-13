@@ -1,29 +1,44 @@
 {
-  "name": "kof_bot",
-  "version": "0.0.1",
-  "description": "Official Kingdom of France's bot for BitCraft Online",
-  "homepage": "https://github.com/Lebenet/KoF_bot#readme",
-  "bugs": {
-    "url": "https://github.com/Lebenet/KoF_bot/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Lebenet/KoF_bot.git"
-  },
-  "license": "ISC",
-  "author": "Lebenet",
-  "type": "commonjs",
-  "main": "main.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "chokidar": "^4.0.3",
-    "discord.js": "^14.21.0",
-    "dotenv": "^17.2.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.30.0",
-    "eslint": "^9.30.0"
-  }
+    "name": "kof_bot",
+    "version": "0.0.1",
+    "description": "Official Kingdom of France's bot for BitCraft Online",
+    "homepage": "https://github.com/Lebenet/KoF_bot#readme",
+    "bugs": {
+        "url": "https://github.com/Lebenet/KoF_bot/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Lebenet/KoF_bot.git"
+    },
+    "license": "ISC",
+    "author": "Lebenet",
+    "type": "commonjs",
+    "main": "main.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "prepare": "husky"
+    },
+    "dependencies": {
+        "chokidar": "^4.0.3",
+        "discord.js": "^14.21.0",
+        "dotenv": "^17.2.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.30.0",
+        "eslint": "^9.30.0",
+        "eslint-config-prettier": "^10.1.5",
+        "husky": "^9.1.7",
+        "prettier": "3.6.2"
+    },
+    "lint-staged": {
+        "*.{js,jsx,ts,tsx,json,css,scss,md}": [
+            "prettier --write",
+            "eslint --fix"
+        ]
+    },
+    "husky": {
+        "hooks": {
+            "pre-commit": "lint-staged"
+        }
+    }
 }

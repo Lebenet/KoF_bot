@@ -1,19 +1,31 @@
 // Imports
-const fs = require('node:fs');
-const path = require('node:path');
-const { Client, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
-const { start } = require('./utils/watcher.js');
-const { getSlashCommands, getGuildCommands } = require('./utils/commandLoader.js');
-const { getConfig } = require('./utils/configLoader.js');
-const { saveModalData, waitForUnlock, resendModal } = require('./utils/modalSaver.js');
+// const fs = require("node:fs");
+// const path = require("node:path");
+const {
+    Client,
+    Events,
+    GatewayIntentBits,
+    MessageFlags,
+} = require("discord.js");
+const { start } = require("./utils/watcher.js");
+const {
+    getSlashCommands,
+    getGuildCommands,
+} = require("./utils/commandLoader.js");
+const { getConfig } = require("./utils/configLoader.js");
+const {
+    saveModalData,
+    waitForUnlock,
+    resendModal,
+} = require("./utils/modalSaver.js");
 
 // Load discord bot token from .env
-require('dotenv').config();
+require("dotenv").config();
 const token = process.env.BOT_TOKEN;
 
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-client.once(Events.ClientReady, readyClient => {
+client.once(Events.ClientReady, (readyClient) => {
     console.log(`Bot ready. Currently logged in as ${readyClient.user.tag}`);
 });
 
@@ -32,30 +44,46 @@ async function handleDeferredReply(interaction, content, flags) {
 }
 
 // Handle commands
-client.on(Events.InteractionCreate, async interaction => {
+client.on(Events.InteractionCreate, async (interaction) => {
     const config = getConfig();
 
     // Slash command
     if (interaction.isChatInputCommand()) {
         // Make sure that nothing happens in the few milliseconds while reloading the command
-        if (config.locked && interaction.commandName != 'lockbot'){
-            await handleDeferredReply(interaction, 'Bot is reloading, please try again shortly.', MessageFlags.Ephemeral);
+        if (config.locked && interaction.commandName != "lockbot") {
+            await handleDeferredReply(
+                interaction,
+                "Bot is reloading, please try again shortly.",
+                MessageFlags.Ephemeral,
+            );
             return;
         }
 
         // Get the correct command using guildId and the command name
-        const commands = getSlashCommands(getGuildCommands(interaction.guildId));
+        const commands = getSlashCommands(
+            getGuildCommands(interaction.guildId),
+        );
         if (commands.size === 0) {
-            console.warn(`[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username (interaction.user.id)}.`);
-            await handleDeferredReply(interaction, 'Warning: This guild is not authorized to operate this application. Please contact `lebenet` on Discord if you think this is a mistake.', MessageFlags.Ephemeral);
+            console.warn(
+                `[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username(interaction.user.id)}.`,
+            );
+            await handleDeferredReply(
+                interaction,
+                "Warning: This guild is not authorized to operate this application. Please contact `lebenet` on Discord if you think this is a mistake.",
+                MessageFlags.Ephemeral,
+            );
             return;
-	    }
+        }
 
-	    const command = commands.get(interaction.commandName);
+        const command = commands.get(interaction.commandName);
 
         if (!command) {
             console.error(`No ${interaction.commandName} command found.`);
-            await handleDeferredReply(interaction, 'This command doesn\'t exists.', MessageFlags.Ephemeral);
+            await handleDeferredReply(
+                interaction,
+                "This command doesn't exists.",
+                MessageFlags.Ephemeral,
+            );
             return;
         }
 
@@ -63,7 +91,11 @@ client.on(Events.InteractionCreate, async interaction => {
             await command.execute(interaction, config);
         } catch (err) {
             console.error(`[EXECUTE] An error occured:\n`, err);
-            await handleDeferredReply(interaction, 'An error occured while executing this bot command.', MessageFlags.Ephemeral);
+            await handleDeferredReply(
+                interaction,
+                "An error occured while executing this bot command.",
+                MessageFlags.Ephemeral,
+            );
         }
     }
 
@@ -72,7 +104,11 @@ client.on(Events.InteractionCreate, async interaction => {
         // Make sure that nothing happens in the few milliseconds while reloading, but also saves the user input
         if (config.locked) {
             saveModalData(interaction); // Maybe move WaitForUnlock call inside this function
-            await handleDeferredReply(interaction, 'Bot is reloading, your form data has been saved.\n Bot will DM you when it\'s finished.', MessageFlags.Ephemeral);
+            await handleDeferredReply(
+                interaction,
+                "Bot is reloading, your form data has been saved.\n Bot will DM you when it's finished.",
+                MessageFlags.Ephemeral,
+            );
 
             // call a watcher to resend forms after unlock
             await waitForUnlock(client.users);
@@ -80,49 +116,61 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         // Handle modal submit
-	const elms = interaction.customId.split('|');
-	
-	const guildId = elms[0];
-	interaction.guildId = guildId;
-	const command = getGuildCommands(guildId).get(interaction.commandName);
-        
-	const handlerName = elms[3];
-	try {
-		command[handlerName](interaction, config);
-	} catch (err) {
-		console.error(`[EXECUTE] An error occured:\n`, err);
-		await handleDeferredReply(interaction, 'An error occured while executing this command.', MessageFlags.Ephemeral);
-	}
-	//console.log('received modal');
+        const elms = interaction.customId.split("|");
+
+        const guildId = elms[0];
+        interaction.guildId = guildId;
+        const command = getGuildCommands(guildId).get(interaction.commandName);
+
+        const handlerName = elms[3];
+        try {
+            command[handlerName](interaction, config);
+        } catch (err) {
+            console.error(`[EXECUTE] An error occured:\n`, err);
+            await handleDeferredReply(
+                interaction,
+                "An error occured while executing this command.",
+                MessageFlags.Ephemeral,
+            );
+        }
+        // console.log('received modal');
     }
 
     // Button click
     if (interaction.isButton()) {
         // Make sure that nothing happens in the few milliseconds while reloading, but also saves the user input
         if (config.locked) {
-            await handleDeferredReply(interaction, 'Bot is reloading. Please click again shortly.', MessageFlags.Ephemeral);
+            await handleDeferredReply(
+                interaction,
+                "Bot is reloading. Please click again shortly.",
+                MessageFlags.Ephemeral,
+            );
             return;
         }
 
-        if (interaction.customId.startsWith('resend_modal')) {
+        if (interaction.customId.startsWith("resend_modal")) {
             // Resend modal button
             resendModal(interaction);
             return;
         }
 
         // Handle other buttons
-	const elms = interaction.customId.split('|');
-	
-	const guildId = elms[0];
-	interaction.guildId = guildId;
-	const command = getGuildCommands(guildId).get(interaction.commandName);
-        
-	const handlerName = elms[3];
-	try {
-		command[handlerName](interaction, config);
-	} catch (err) {
-		console.error(`[EXECUTE] An error occured:\n`, err);
-		await handleDeferredReply(interaction, 'An error occured while executing this command.', MessageFlags.Ephemeral);
-	}
+        const elms = interaction.customId.split("|");
+
+        const guildId = elms[0];
+        interaction.guildId = guildId;
+        const command = getGuildCommands(guildId).get(interaction.commandName);
+
+        const handlerName = elms[3];
+        try {
+            command[handlerName](interaction, config);
+        } catch (err) {
+            console.error(`[EXECUTE] An error occured:\n`, err);
+            await handleDeferredReply(
+                interaction,
+                "An error occured while executing this command.",
+                MessageFlags.Ephemeral,
+            );
+        }
     }
 });
