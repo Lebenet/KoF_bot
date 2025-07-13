@@ -1,13 +1,16 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { lockBot, unlockBot } = require("../../utils/configLoader");
 
-async function lock(interaction, _config) {
+async function lock(interaction, config) {
+    if (!config.admins || !config.admins.includes(interaction.user.id))
+        return;
+
     const locked = interaction.options.getBoolean("lock");
 
     if (locked) lockBot();
     else unlockBot();
 
-    await interaction.reply("operation succesfull");
+    await interaction.reply(`Bot was succesfully ${locked ? "locked" : "unlocked"}.`);
 }
 
 module.exports = {
