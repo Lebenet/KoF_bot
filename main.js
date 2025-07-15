@@ -18,6 +18,7 @@ const {
     waitForUnlock,
     resendModal,
 } = require("./utils/modalSaver.js");
+const { setClient } = require("./utils/taskRunner.js");
 
 // Load discord bot token from .env
 require("dotenv").config();
@@ -27,6 +28,7 @@ const token = process.env.BOT_TOKEN;
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.once(Events.ClientReady, (readyClient) => {
     console.log(`Bot ready. Currently logged in as ${readyClient.user.tag}`);
+    setClient(client);
 });
 
 // Log in to bot client

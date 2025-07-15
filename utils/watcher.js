@@ -48,7 +48,7 @@ function start() {
     console.log("config:\n", config);
 
     // Load commands
-    initLoad();
+    initCmdLoad();
     const commands = getCommands();
     console.log("commands:\n", commands);
 

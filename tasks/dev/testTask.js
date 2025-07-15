@@ -1,4 +1,4 @@
-async function testTask(_data, _config, _client, _guildId) {
+async function testTask(_data, _config, _client) {
     console.log("Test task");
 }
 

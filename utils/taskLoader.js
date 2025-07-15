@@ -5,7 +5,7 @@ Overall the same as commandLoader.js, with a few tweaks
 // Imports
 const fs = require("node:fs");
 const path = require("node:path");
-const { computeNextTimestamp } = requite("./taskUtils.js");
+const { computeNextTimestamp } = require("./taskUtils.js");
 
 // Dynamically loaded tasks
 const tasks = {
@@ -22,7 +22,13 @@ const getTargetMap = (guildId) =>
                 ? tasks.dev
                 : undefined;
 
-function deactivate(taskName, guildId) {
+function deactivateTask(task) {
+    task.data.activated = false;
+    task.data.nextTimestamp = undefined;
+    return true;
+}
+
+function deactivateTaskByName(taskName, guildId) {
     // Get correct map
     const targetMap = getTargetMap(guildId);
     if (!targetMap) {
@@ -31,13 +37,29 @@ function deactivate(taskName, guildId) {
     }
 
     const task = targetMap.get(taskName);
-    task.activated = false;
-    task.nextTimestamp = undefined;
-    return true;
+    if (!task) {
+        console.log(`[WARN] Activate task ${taskName}: task doesn't exist.`);
+        return;
+    }
+
+    return deactivateTask(task);
 }
 
 // Also resets repeats
-function activate(taskName, guildId) {
+function activateTask(task) {
+    task.data.activated = true;
+    if (task.data.repeat > 0)
+        task.data.repeats = task.data.repeat;
+    try {
+        task.data.nextTimestamp = computeNextTimestamp(task.data);
+    } catch (e) {
+        console.error(`[ERROR] Task Activate:`, e);
+        return false;
+    }
+    return true;
+}
+
+function activateTaskByName(taskName, guildId) {
     // Get correct map
     const targetMap = getTargetMap(guildId);
     if (!targetMap) {
@@ -46,16 +68,12 @@ function activate(taskName, guildId) {
     }
 
     const task = targetMap.get(taskName);
-    task.activated = true;
-    if (task.repeat > 0)
-        task.repeats = task.repeat;
-    try {
-        task.nextTimestamp = computeNextTimestamp(task.data);
-    } catch (e) {
-        console.error(`[ERROR] Task Activate:`, e);
-        return false;
+    if (!task) {
+        console.log(`[WARN] Activate task ${taskName}: task doesn't exist.`);
+        return;
     }
-    return true;
+
+    return activateTask(task);
 }
 
 function unloadTask(file, filePath, targetMap) {
@@ -89,7 +107,7 @@ function loadTask(file, dir) {
     const filePath = path.resolve(path.join(dir, file));
     console.log(filePath, file, dir);
 
-    unloadtask(file, filePath, targetMap);
+    unloadTask(file, filePath, targetMap);
 
     try {
         // Load task to require memory
@@ -97,8 +115,9 @@ function loadTask(file, dir) {
 
         if ("data" in task && "run" in task) {
             // Load task to map
+            task.data.guildId = guildId; // Used later in taskRunner and available in task.run()
             targetMap.set(task.data.name, task);
-            if (task.data.autostart) activate(task, guildId);
+            if (task.data.autostart) activateTaskByName(task.data.name, guildId);
         } else {
             console.warn(
                 `[HOT-RELOAD] | [WARN] task ${name} missing "data" or "execute" fields.`,
@@ -113,7 +132,7 @@ function loadTask(file, dir) {
     }
 }
 
-function initLoad() {
+function initTaskLoad() {
     // Load public tasks
     fs.readdirSync(publicDir)
         .filter((file) => file.endsWith(".js"))
@@ -133,23 +152,28 @@ const getGuildtasks = (guildId) => {
             return tasks.public;
         default:
             console.warn(
-                "[WARN] | Unauthorized server tried to execute... a task ?. Guild ID: ${guildId}",
+                `[WARN] | Unauthorized server tried to execute... a task ?. Guild ID: ${guildId}`,
             );
             return new Map();
     }
 };
 
-const gettasks = () => tasks;
-const gettasksArray = (tasks) =>
-    [...tasks.values()].map((task) => task.data.toJSON());
+const getTasks = () => tasks;
+// Useless rn
+/*
+const getTasksArray = (tasks) =>
+    [...tasks.values()].map((task) => task.data);
+*/
 
 module.exports = {
-    initLoad,
+    initTaskLoad,
     unloadTask,
-    deactivate,
+    deactivateTaskByName,
+    deactivateTask,
     loadTask,
-    activate,
-    gettasks,
-    gettasksArray,
+    activateTaskByName,
+    activateTask,
+    getTasks,
+    // getTasksArray,
     getGuildtasks,
 };

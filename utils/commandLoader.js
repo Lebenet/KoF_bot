@@ -63,7 +63,7 @@ function loadCommand(file, dir) {
         // TODO: implement reloading old behaviour
     }
 }
-function initLoad() {
+function initCmdLoad() {
     // Load public commands
     fs.readdirSync(publicDir)
         .filter((file) => file.endsWith(".js"))
@@ -122,7 +122,7 @@ async function sendCommands(guildId) {
 }
 
 module.exports = {
-    initLoad,
+    initCmdLoad,
     unloadCommand,
     loadCommand,
     getCommands,
