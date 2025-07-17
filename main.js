@@ -62,9 +62,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         // Get the correct command using guildId and the command name
-        const commands = getSlashCommands(
-            getGuildCommands(interaction.guildId),
-        );
+        const commands = getSlashCommands(getGuildCommands(interaction.guildId));
         if (commands.size === 0) {
             console.warn(
                 `[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username(interaction.user.id)}.`,

@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {
-    initLoad,
+    initCmdLoad,
     unloadCommand,
     loadCommand,
     sendCommands,
