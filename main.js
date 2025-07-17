@@ -45,9 +45,11 @@ if (!fs.existsSync(path.resolve("temp/")))
     fs.mkdirSync("temp/");
 
 // Start watcher
+console.log(`[STARTUP] Starting watcher...`);
 start();
 
 // Start task runner
+console.log(`[STARTUP] Starting task runner...`);
 startTaskRunner();
 
 async function handleDeferredReply(interaction, content, flags) {
