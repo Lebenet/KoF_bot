@@ -37,6 +37,8 @@ client.login(token);
 // Start watcher
 start();
 
+// Start task runner
+
 async function handleDeferredReply(interaction, content, flags) {
     if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: content, flags: flags });

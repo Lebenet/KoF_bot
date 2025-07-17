@@ -144,7 +144,7 @@ function initTaskLoad() {
         .forEach((file) => loadTask(file, devDir));
 }
 
-const getGuildtasks = (guildId) => {
+const getGuildTasks = (guildId) => {
     switch (guildId) {
         case process.env.DEV_GUILD_ID:
             return tasks.dev;
@@ -175,5 +175,5 @@ module.exports = {
     activateTask,
     getTasks,
     // getTasksArray,
-    getGuildtasks,
+    getGuildTasks,
 };

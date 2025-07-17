@@ -22,7 +22,14 @@ function stopTaskRunner() {
 
 async function runTask(task) {
     try {
-        await task.run(task.data, getConfig(), refClient);
+        const config = getConfig();
+
+        const ctx = {
+            config: config,
+            bot: refClient,
+        };
+
+        await task.run(task.data, ctx);
         if (task.data.repeats === 1) {
             deactivateTask(task);
         } else if (task.data.repeats > 1) {
