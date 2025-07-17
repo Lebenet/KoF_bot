@@ -1,24 +1,30 @@
 // Imports
-// const fs = require("node:fs");
-// const path = require("node:path");
+const fs = require("node:fs");
+const path = require("node:path");
+
 const {
     Client,
     Events,
     GatewayIntentBits,
     MessageFlags,
 } = require("discord.js");
+
 const { start } = require("./utils/watcher.js");
+
 const {
     getSlashCommands,
     getGuildCommands,
 } = require("./utils/commandLoader.js");
+
 const { getConfig } = require("./utils/configLoader.js");
+
 const {
     saveModalData,
     waitForUnlock,
     resendModal,
 } = require("./utils/modalSaver.js");
-const { setClient } = require("./utils/taskRunner.js");
+
+const { setClient, startTaskRunner } = require("./utils/taskRunner.js");
 
 // Load discord bot token from .env
 require("dotenv").config();
@@ -34,10 +40,15 @@ client.once(Events.ClientReady, (readyClient) => {
 // Log in to bot client
 client.login(token);
 
+// Ensure temp dir exists
+if (!fs.existsSync(path.resolve("temp/")))
+    fs.mkdirSync("temp/");
+
 // Start watcher
 start();
 
 // Start task runner
+startTaskRunner();
 
 async function handleDeferredReply(interaction, content, flags) {
     if (interaction.replied || interaction.deferred) {
