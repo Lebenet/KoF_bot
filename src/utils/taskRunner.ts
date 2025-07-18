@@ -1,27 +1,28 @@
-const { computeNextTimestamp, fakeParisTimeToUTC } = require("./taskUtils.js");
-const { getTasks, deactivateTask } = require("./taskLoader.js");
-const { getConfig } = require("./configLoader.js");
-const { DateTime } = require("luxon");
+import { computeNextTimestamp, fakeParisTimeToUTC } from "./taskUtils";
+import { getTasks, deactivateTask } from "./taskLoader";
+import { getConfig } from "./configLoader";
+
+import { Client } from "discord.js";
 
 // "Global" Variables
-let refClient = null;
-let intervalId = null;
+let refClient: Client | null = null;
+let intervalId: NodeJS.Timeout | null = null;
 
 // Setters
-const setClient = (bot) => refClient = bot;
+export const setClient = (bot: Client) => (refClient = bot);
 
-function startTaskRunner() {
+export function startTaskRunner() {
     if (intervalId) return;
     intervalId = setInterval(checker, 60_000); // check every minute
 }
 
-function stopTaskRunner() {
+export function stopTaskRunner() {
     if (!intervalId) return;
     clearInterval(intervalId);
     intervalId = null;
 }
 
-async function runTask(task) {
+async function runTask(task: any) {
     try {
         const config = getConfig();
 
@@ -38,21 +39,29 @@ async function runTask(task) {
         } else if (task.data.repeats === 1) {
             deactivateTask(task);
         }
-
     } catch (err) {
-        console.log(`[ERROR] Task ${task.data.name} run: an error occured:\n`, err);
+        console.log(
+            `[ERROR] Task ${task.data.name} run: an error occured:\n`,
+            err,
+        );
     }
-    
+
     try {
         if (task.data.activated)
             task.data.nextTimestamp = computeNextTimestamp(task.data);
         else task.data.nextTimestamp = undefined;
     } catch (err) {
-        console.log(`[WARN] Task ${task.data.name} computeNextTimestamp failed:`, err, "\n deactivating task.");
+        console.log(
+            `[WARN] Task ${task.data.name} computeNextTimestamp failed:`,
+            err,
+            "\n deactivating task.",
+        );
         task.data.activated = false;
     }
 
-    console.log(`[TASK] Task ${task.data.name} ran succesfully, and next timestamp has been set. (${new Date(task.data.nextTimestamp)})`);
+    console.log(
+        `[TASK] Task ${task.data.name} ran succesfully, and next timestamp has been set. (${new Date(task.data.nextTimestamp)})`,
+    );
 }
 
 async function checker() {
@@ -64,8 +73,13 @@ async function checker() {
             const now = fakeParisTimeToUTC();
             // Safeguard (even though checked in taskLoader)
             if (typeof task.run !== "function") {
-                console.warn(`[WARN] Task ${task.data.name} has no valid run function.`);
-            } else if (task.data.activated && task.data.nextTimestamp <= now.getTime()) {
+                console.warn(
+                    `[WARN] Task ${task.data.name} has no valid run function.`,
+                );
+            } else if (
+                task.data.activated &&
+                task.data.nextTimestamp <= now.getTime()
+            ) {
                 // console.log(now.getHours() + ":" + now.getMinutes());
                 console.log(`[INFO] Running task: ${task.data.name}`);
                 runTask(task);
@@ -73,9 +87,3 @@ async function checker() {
         }
     }
 }
-
-module.exports = {
-    setClient,
-    startTaskRunner,
-    stopTaskRunner,
-};

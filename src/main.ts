@@ -1,37 +1,49 @@
 // Imports
-const fs = require("node:fs");
-const path = require("node:path");
+import fs from "fs";
+import path from "path";
 
-const {
+// CWD safeguard
+const cwd = process.cwd();
+const cwdShort = cwd.replace(path.dirname(cwd), "").replace(/[/\\]?/g, "");
+if (cwdShort === "KoF_bot") process.chdir("./dist");
+else if (!["KoF_bot", "dist"].includes(cwdShort))
+    throw new Error(
+        `[ERROR] Current working directory: ${cwdShort}. Please run this inside either project root or dist.`,
+    );
+
+import {
+    ButtonInteraction,
+    ChatInputCommandInteraction,
     Client,
     Events,
     GatewayIntentBits,
+    Interaction,
     MessageFlags,
-} = require("discord.js");
+    ModalSubmitInteraction,
+} from "discord.js";
 
-const { start } = require("./utils/watcher.js");
+import { start } from "./utils/watcher";
 
-const {
-    getSlashCommands,
-    getGuildCommands,
-} = require("./utils/commandLoader.js");
+import { getSlashCommands, getGuildCommands } from "./utils/commandLoader";
 
-const { getConfig } = require("./utils/configLoader.js");
+import { getConfig } from "./utils/configLoader";
 
-const {
-    saveModalData,
-    waitForUnlock,
-    resendModal,
-} = require("./utils/modalSaver.js");
+import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
 
-const { setClient, startTaskRunner } = require("./utils/taskRunner.js");
+import { setClient, startTaskRunner } from "./utils/taskRunner";
 
 // Load discord bot token from .env
 require("dotenv").config();
 const token = process.env.BOT_TOKEN;
 
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+    ],
+});
 client.once(Events.ClientReady, (readyClient) => {
     console.log(`Bot ready. Currently logged in as ${readyClient.user.tag}`);
     setClient(client);
@@ -41,8 +53,7 @@ client.once(Events.ClientReady, (readyClient) => {
 client.login(token);
 
 // Ensure temp dir exists
-if (!fs.existsSync(path.resolve("temp/")))
-    fs.mkdirSync("temp/");
+if (!fs.existsSync(path.resolve("temp/"))) fs.mkdirSync("temp/");
 
 // Start watcher
 console.log(`[STARTUP] Starting watcher...`);
@@ -52,20 +63,30 @@ start();
 console.log(`[STARTUP] Starting task runner...`);
 startTaskRunner();
 
-async function handleDeferredReply(interaction, content, flags) {
+async function handleDeferredReply(
+    interaction:
+        | ChatInputCommandInteraction
+        | ButtonInteraction
+        | ModalSubmitInteraction,
+    content: string,
+    flags: any,
+) {
     if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: content, flags: flags });
+        await interaction.followUp({ content, flags });
     } else {
-        await interaction.reply({ content: content, flags: flags });
+        await interaction.reply({ content, flags });
     }
 }
 
 // Handle commands
-client.on(Events.InteractionCreate, async (interaction) => {
-    const config = getConfig();
+client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    const config: any = getConfig();
 
     // Slash command
     if (interaction.isChatInputCommand()) {
+        // typeguard (not necessary but typescript annoying otherwise)
+        if (!interaction.guildId) return;
+
         // Make sure that nothing happens in the few milliseconds while reloading the command
         if (config.locked && interaction.commandName != "lockbot") {
             await handleDeferredReply(
@@ -77,10 +98,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         // Get the correct command using guildId and the command name
-        const commands = getSlashCommands(getGuildCommands(interaction.guildId));
+        const commands = getSlashCommands(
+            getGuildCommands(interaction.guildId),
+        );
         if (commands.size === 0) {
             console.warn(
-                `[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username(interaction.user.id)}.`,
+                `[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username}(${interaction.user.id}).`,
             );
             await handleDeferredReply(
                 interaction,
@@ -131,8 +154,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         // Handle modal submit
-        const elms = interaction.customId.split("|");
-        const [guildId, commandName, handlerName] = elms;
+        const [guildId, commandName, handlerName]: string[] =
+            interaction.customId.split("|");
         const command = getGuildCommands(guildId).get(commandName);
 
         // If saved modal resent to the user
@@ -172,8 +195,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         // Handle other buttons
-        const elms = interaction.customId.split("|");
-        const [guildId, commandName, handlerName] = elms;
+        const [guildId, commandName, handlerName]: string[] =
+            interaction.customId.split("|");
         const command = getGuildCommands(guildId).get(commandName);
 
         try {

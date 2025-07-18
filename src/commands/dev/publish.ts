@@ -1,40 +1,47 @@
-const { SlashCommandBuilder } = require("discord.js");
+import {
+    SlashCommandBuilder,
+    ChatInputCommandInteraction,
+    MessageFlags,
+} from "discord.js";
 
-const fs = require("node:fs");
-const fsp = require("node:fs/promises");
-const path = require("node:path");
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
 
 /*
 Command to publish a test command|task to prod
 Requires bot admin
 */
 
-const dirName = (type) => { ["command", "task"].includes(type) ? type + "s" : undefined };
+const dirName = (type: string): string =>
+    ["command", "task"].includes(type) ? type + "s" : "";
 
-async function publish(interaction, config) {
+async function publish(interaction: ChatInputCommandInteraction, config: any) {
     try {
         // Give more time in case something weird happens with the filesystem
         await interaction.deferReply();
 
         // Check user has sufficient permissions
-        if (!config.admins || !config.admins.includes(interaction.member.user.id)) {
-            await interaction.editReply({
-                content: `Only bot admins can use this command.`,
-                flags: MessageFlags.Ephemeral,
-            });
+        if (
+            !config.admins ||
+            !interaction.member ||
+            !config.admins.includes(interaction.member.user.id)
+        ) {
+            await interaction.editReply(
+                `Only bot admins can use this command.`,
+            );
             return;
         }
 
         // Get the correct directory
-        const dir = dirName(interaction.options.getString("type"));
+        const dir: string = dirName(
+            interaction.options.getString("type") ?? "",
+        );
         if (!dir) {
-            await interaction.editReply({
-                content: `This type isn't publishable.`,
-                flags: MessageFlags.Ephemeral,
-            });
+            await interaction.editReply(`This type isn't publishable.`);
             return;
         }
-        
+
         // Get the file from the command arg
         const name = interaction.options.getString("name");
         const file = path.resolve(`./${dir}/dev/${name}.js`);
@@ -47,10 +54,9 @@ async function publish(interaction, config) {
                 `[ERROR] | publish: File ${file} does not exist: \n`,
                 err,
             );
-            await interaction.editReply({
-                content: `Command|Task **\`/${name}\`** does not exist.`,
-                flags: MessageFlags.Ephemeral,
-            });
+            await interaction.editReply(
+                `Command|Task **\`/${name}\`** does not exist.`,
+            );
             return;
         }
 
@@ -62,26 +68,21 @@ async function publish(interaction, config) {
                     `[ERROR] | publish: An error occured while publishing ${name} command|task:\n`,
                     err,
                 );
-                await interaction.editReply({
-                    content: `Error while publishing **\`/${name}\`** command|task.`,
-                    flags: MessageFlags.Ephemeral,
-                });
+                await interaction.editReply(
+                    `Error while publishing **\`/${name}\`** command|task.`,
+                );
             } else {
                 console.log(
                     `[COMMANDS] | publish: Succesfully published the ${name} command|task.`,
                 );
-                await interaction.editReply({
-                    content: `Succesfully published the **\`/${name}\`** command|task.`,
-                    flags: MessageFlags.Ephemeral,
-                });
+                await interaction.editReply(
+                    `Succesfully published the **\`/${name}\`** command|task.`,
+                );
             }
         });
     } catch (err) {
         console.error("[ERROR] | publish: Something went wrong:\n", err);
-        await interaction.editReply({
-            content: "Something went wrong.",
-            flags: MessageFlags.Ephemeral,
-        });
+        await interaction.editReply("Something went wrong.");
     }
 }
 
@@ -93,7 +94,7 @@ module.exports = {
             option
                 .setName("type")
                 .setDescription("Type (command|task)")
-                .setRequired(true)
+                .setRequired(true),
         )
         .addStringOption((option) =>
             option

@@ -1,32 +1,32 @@
-const chokidar = require("chokidar");
-const fs = require("node:fs");
-const path = require("node:path");
+import chokidar from "chokidar";
+import fs from "fs";
+import path, { format } from "path";
 
-const {
+import {
     initCmdLoad,
     unloadCommand,
     loadCommand,
     sendCommands,
     getCommands,
     getGuildCommands,
-} = require("./commandLoader.js");
+} from "./commandLoader";
 
-const {
+import {
     loadConfig,
     addSingleConfig,
     /* updateSingleConfig, deleteSingleConfig, */ getConfig,
     lockBot,
     unlockBot,
     deleteSingleConfig,
-} = require("./configLoader.js");
+} from "./configLoader";
 
-const {
+import {
     initTaskLoad,
     unloadTask,
     loadTask,
     getTasks,
     getGuildTasks,
-} = require("./taskLoader.js");
+} from "./taskLoader";
 
 const folders = {
     commands: {
@@ -39,7 +39,7 @@ const folders = {
     },
 };
 
-function taskWatcherHandler(filePath, event) {
+function taskWatcherHandler(filePath: string, event: string) {
     const { file, dir } = getFileDir(filePath);
     if (!file || !dir) {
         console.error(
@@ -54,8 +54,8 @@ function taskWatcherHandler(filePath, event) {
             loadTask(file, folders.tasks[dir]);
             break;
         case "unlink":
-            const guild_id = getGuildId(dir);
-            unloadTask(file, filePath, getGuildTasks(guild_id));
+            const guildId = getGuildId(dir);
+            unloadTask(file, filePath, getGuildTasks(guildId));
             break;
         default:
             console.log(`[WARN] Task Watcher: Unhandled event ${event}.`);
@@ -63,22 +63,24 @@ function taskWatcherHandler(filePath, event) {
 
     console.log(getTasks());
 
-    console.log(`[WATCHER](Task) ${event}${event === "change" ? "" : "e"}d: ${filePath}`);
+    console.log(
+        `[WATCHER](Task) ${event}${event === "change" ? "" : "e"}d: ${filePath}`,
+    );
 }
 
-function getFileDir(filePath) {
+function getFileDir(filePath: string) {
     const file = path.basename(filePath);
     const dir = path.dirname(filePath);
     console.log(file, dir); // FIXME: TO TEST
     return { file, dir };
 }
 
-const getGuildId = (dir) =>
+const getGuildId = (dir: string): string =>
     dir.endsWith(path.join("commands", "public"))
-        ? process.env.GUILD_ID
-        : process.env.DEV_GUILD_ID;
+        ? (process.env.GUILD_ID ?? "")
+        : (process.env.DEV_GUILD_ID ?? "");
 
-function start() {
+export function start() {
     // Ensure that config folder exists
     if (!fs.existsSync("./data/")) {
         fs.mkdirSync("./data");
@@ -95,25 +97,22 @@ function start() {
     console.log("commands:\n", commands);
 
     // Register slash commands to discord
-    sendCommands(process.env.DEV_GUILD_ID);
-    sendCommands(process.env.GUILD_ID);
+    sendCommands(process.env.DEV_GUILD_ID ?? "");
+    sendCommands(process.env.GUILD_ID ?? "");
 
     // Load tasks
-    initTaskLoad()
+    initTaskLoad();
     const tasks = getTasks();
     console.log("Tasks:\n", tasks);
 
-    const watcherTask = chokidar.watch(
-        ["./tasks/public/", "./tasks/dev/"],
-        {
-            persistent: true, // runs as long as the bot is up
-            ignoreInitial: true, // ignore initial files
-            ignored: (filePath, stats) =>
-                stats?.isFile() && !filePath.endsWith(".js"), // only watch .js files
-            usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
-            interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
-        },
-    );
+    const watcherTask = chokidar.watch(["./tasks/public/", "./tasks/dev/"], {
+        persistent: true, // runs as long as the bot is up
+        ignoreInitial: true, // ignore initial files
+        ignored: (filePath, stats) =>
+            (stats?.isFile() ?? true) && !filePath.endsWith(".js"), // only watch .js files
+        usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
+        interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
+    });
 
     const watcherCmd = chokidar.watch(
         ["./commands/public/", "./commands/dev/"],
@@ -121,7 +120,7 @@ function start() {
             persistent: true, // runs as long as the bot is up
             ignoreInitial: true, // ignore initial files
             ignored: (filePath, stats) =>
-                stats?.isFile() && !filePath.endsWith(".js"), // only watch .js files
+                (stats?.isFile() ?? true) && !filePath.endsWith(".js"), // only watch .js files
             usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
             interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
         },
@@ -131,16 +130,21 @@ function start() {
         persistent: true,
         ignoreInitial: true,
         ignored: (filePath, stats) =>
-            stats?.isFile() && !filePath.endsWith(".json"),
+            (stats?.isFile() ?? true) && !filePath.endsWith(".json"),
         usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
         interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
     });
 
     watcherTask
-        .on("add", (filePath) => { taskWatcherHandler(filePath, "add") })
-        .on("change", (filePath) => { taskWatcherHandler(filePath, "change") })
-        .on("unlink", (filePath) => { taskWatcherHandler(filePath, "unlink") });
-
+        .on("add", (filePath) => {
+            taskWatcherHandler(filePath, "add");
+        })
+        .on("change", (filePath) => {
+            taskWatcherHandler(filePath, "change");
+        })
+        .on("unlink", (filePath) => {
+            taskWatcherHandler(filePath, "unlink");
+        });
 
     watcherCmd
         .on("add", (filePath) => {
@@ -260,7 +264,3 @@ function start() {
             unlockBot();
         });
 }
-
-module.exports = {
-    start,
-};

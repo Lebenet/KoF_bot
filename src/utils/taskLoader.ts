@@ -3,32 +3,32 @@ Overall the same as commandLoader.js, with a few tweaks
 */
 
 // Imports
-const fs = require("node:fs");
-const path = require("node:path");
-const { computeNextTimestamp } = require("./taskUtils.js");
+import fs from "fs";
+import path from "path";
+import { computeNextTimestamp } from "./taskUtils";
 
 // Dynamically loaded tasks
 const tasks = {
-    public: new Map(),
-    dev: new Map(),
+    public: new Map<string, any>(),
+    dev: new Map<string, any>(),
 };
 const publicDir = "./tasks/public/";
 const devDir = "./tasks/dev/";
 
-const getTargetMap = (guildId) => 
-        guildId == process.env.GUILD_ID
-            ? tasks.public 
-            : guildId == process.env.DEV_GUILD_ID
-                ? tasks.dev
-                : undefined;
+const getTargetMap = (guildId: string): Map<string, any> | undefined =>
+    guildId == process.env.GUILD_ID
+        ? tasks.public
+        : guildId == process.env.DEV_GUILD_ID
+          ? tasks.dev
+          : undefined;
 
-function deactivateTask(task) {
+export function deactivateTask(task: any) {
     task.data.activated = false;
     task.data.nextTimestamp = undefined;
     return true;
 }
 
-function deactivateTaskByName(taskName, guildId) {
+export function deactivateTaskByName(taskName: string, guildId: string) {
     // Get correct map
     const targetMap = getTargetMap(guildId);
     if (!targetMap) {
@@ -46,10 +46,9 @@ function deactivateTaskByName(taskName, guildId) {
 }
 
 // Also resets repeats
-function activateTask(task) {
+export function activateTask(task: any) {
     task.data.activated = true;
-    if (task.data.repeat > 0)
-        task.data.repeats = task.data.repeat;
+    if (task.data.repeat > 0) task.data.repeats = task.data.repeat;
     try {
         task.data.nextTimestamp = computeNextTimestamp(task.data);
     } catch (e) {
@@ -59,7 +58,7 @@ function activateTask(task) {
     return true;
 }
 
-function activateTaskByName(taskName, guildId) {
+export function activateTaskByName(taskName: string, guildId: string) {
     // Get correct map
     const targetMap = getTargetMap(guildId);
     if (!targetMap) {
@@ -76,7 +75,11 @@ function activateTaskByName(taskName, guildId) {
     return activateTask(task);
 }
 
-function unloadTask(file, filePath, targetMap) {
+export function unloadTask(
+    file: string,
+    filePath: string,
+    targetMap: Map<string, any>,
+) {
     // Delete task from require memory
     try {
         delete require.cache[require.resolve(filePath)];
@@ -89,21 +92,28 @@ function unloadTask(file, filePath, targetMap) {
     targetMap.delete(file.replace(".js", ""));
 }
 
-function loadTask(file, dir) {
+export function loadTask(file: string, dir: string) {
     const targetMap =
         dir === devDir
             ? tasks.dev
             : dir === publicDir
               ? tasks.public
               : undefined;
-    const guildId = dir === devDir ? process.env.DEV_GUILD_ID : process.env.GUILD_ID;
+    const guildId =
+        dir === devDir
+            ? process.env.DEV_GUILD_ID
+            : dir === publicDir
+              ? process.env.GUILD_ID
+              : undefined;
     const name = file.replace(".js", ""); // task name instead of plain filename
 
-    if (!targetMap) {
+    if (!targetMap || !guildId) {
         console.warn(
-            `[WARNING] | HOT-RELOAD: Failed to load task ${name}, dir ${dir} unknown.`,
+            `[WARN] HOT-RELOAD: Failed to load task ${name}, dir ${dir} unknown.`,
         );
+        return;
     }
+
     const filePath = path.resolve(path.join(dir, file));
     console.log(filePath, file, dir);
 
@@ -117,7 +127,8 @@ function loadTask(file, dir) {
             // Load task to map
             task.data.guildId = guildId; // Used later in taskRunner and available in task.run()
             targetMap.set(task.data.name, task);
-            if (task.data.autostart) activateTaskByName(task.data.name, guildId);
+            if (task.data.autostart)
+                activateTaskByName(task.data.name, guildId);
         } else {
             console.warn(
                 `[HOT-RELOAD] | [WARN] task ${name} missing "data" or "execute" fields.`,
@@ -132,7 +143,7 @@ function loadTask(file, dir) {
     }
 }
 
-function initTaskLoad() {
+export function initTaskLoad() {
     // Load public tasks
     fs.readdirSync(publicDir)
         .filter((file) => file.endsWith(".js"))
@@ -144,7 +155,7 @@ function initTaskLoad() {
         .forEach((file) => loadTask(file, devDir));
 }
 
-const getGuildTasks = (guildId) => {
+export const getGuildTasks = (guildId: string): Map<string, any> => {
     switch (guildId) {
         case process.env.DEV_GUILD_ID:
             return tasks.dev;
@@ -154,26 +165,13 @@ const getGuildTasks = (guildId) => {
             console.warn(
                 `[WARN] | Unauthorized server tried to execute... a task ?. Guild ID: ${guildId}`,
             );
-            return new Map();
+            return new Map<string, any>();
     }
 };
 
-const getTasks = () => tasks;
+export const getTasks = () => tasks;
 // Useless rn
 /*
 const getTasksArray = (tasks) =>
     [...tasks.values()].map((task) => task.data);
 */
-
-module.exports = {
-    initTaskLoad,
-    unloadTask,
-    deactivateTaskByName,
-    deactivateTask,
-    loadTask,
-    activateTaskByName,
-    activateTask,
-    getTasks,
-    // getTasksArray,
-    getGuildTasks,
-};

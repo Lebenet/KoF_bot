@@ -1,6 +1,6 @@
-const { SlashCommandBuilder } = require("discord.js");
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 
-async function ping(interaction, _config) {
+async function ping(interaction: ChatInputCommandInteraction, _config: any) {
     await interaction.reply("Pong! dev");
 }
 

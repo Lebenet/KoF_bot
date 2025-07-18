@@ -1,6 +1,6 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const { exit } = require("node:process");
+import fs from "fs";
+import path from "path";
+import { exit } from "process";
 
 /*
 // Files to read
@@ -12,12 +12,12 @@ const dataPaths = {
 */
 
 // Dynamix config holder
-const config = {
+const config: any = {
     locked: false, // Bot lock during hot-reload (or other)
 };
 
-const lockBot = () => (config.locked = true);
-const unlockBot = () => (config.locked = false);
+export const lockBot = () => (config.locked = true);
+export const unlockBot = () => (config.locked = false);
 
 /*
 // Not reset during config reload
@@ -38,21 +38,21 @@ function resetConfig() {
 }
 */
 
-function resolveFromFileName(fileName) {
+function resolveFromFileName(fileName: string) {
     const filePath = path.resolve(`./data/${fileName}`);
     const key = fileName.replace(".json", "");
 
     return { key, filePath };
 }
 
-function addSingleConfig(fileName) {
+export function addSingleConfig(fileName: string) {
     try {
         const { key, filePath } = resolveFromFileName(fileName);
-        const raw = fs.readFileSync(filePath);
+        const raw = fs.readFileSync(filePath, "utf-8");
 
         // parse content
         config[key] = JSON.parse(raw);
-    } catch (err) {
+    } catch (err: any) {
         throw new Error(
             `[HOT-RELOAD] Failed to load new config ${fileName}: ${err.message}`,
         );
@@ -60,7 +60,7 @@ function addSingleConfig(fileName) {
     }
 }
 
-function deleteSingleConfig(fileName) {
+export function deleteSingleConfig(fileName: string) {
     try {
         // Delete entry from config
         const key = fileName.replace(".json", "");
@@ -73,11 +73,13 @@ function deleteSingleConfig(fileName) {
     }
 }
 
-function loadConfig(dataEntries /* list of filenames based on './data/*' */) {
-    dataEntries.forEach((fileName) => {
+export function loadConfig(
+    dataEntries: Array<string> /* list of filenames based on './data/*' */,
+) {
+    dataEntries.forEach((fileName: string) => {
         try {
             addSingleConfig(fileName);
-        } catch (err) {
+        } catch (err: any) {
             console.error(
                 `[CONFIG] Failed to load ${fileName} config file on init: ${err.message}`,
             );
@@ -86,15 +88,4 @@ function loadConfig(dataEntries /* list of filenames based on './data/*' */) {
     });
 }
 
-const getConfig = () => config;
-
-module.exports = {
-    loadConfig,
-    addSingleConfig,
-    // updateSingleConfig,
-    deleteSingleConfig,
-    getConfig,
-    lockBot,
-    unlockBot,
-    // addException
-};
+export const getConfig = () => config;

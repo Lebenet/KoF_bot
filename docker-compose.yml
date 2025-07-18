@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
     kof-bot:
         build:
@@ -10,5 +8,5 @@ services:
         environment:
             - CHOKIDAR_USEPOLLING=true
         volumes:
-            - .:/usr/src/bot
+            - ./dist:/usr/bot/dist
         restart: unless-stopped

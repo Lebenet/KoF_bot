@@ -1,18 +1,23 @@
-const {
+import {
     SlashCommandBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
     ActionRowBuilder,
-} = require("discord.js");
+    ChatInputCommandInteraction,
+    ModalSubmitInteraction,
+} from "discord.js";
 
-async function testmodal(interaction, _config) {
+async function testmodal(
+    interaction: ChatInputCommandInteraction,
+    _config: any,
+) {
     await interaction.showModal(
         new ModalBuilder()
             .setCustomId(`${interaction.guildId}|testmodal|testHandler`)
             .setTitle("Test Modal")
             .addComponents(
-                new ActionRowBuilder().addComponents(
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
                     new TextInputBuilder()
                         .setCustomId(`testId`)
                         .setLabel("the test")
@@ -31,10 +36,12 @@ module.exports = {
         ),
 
     execute: testmodal,
-    testHandler: async function (interaction, _config) {
+    testHandler: async function (
+        interaction: ModalSubmitInteraction,
+        _config: any,
+    ) {
         if (interaction.replied || interaction.deferred)
             interaction.editReply("Modal received");
-        else
-            interaction.reply("Modal received");
+        else interaction.reply("Modal received");
     },
 };

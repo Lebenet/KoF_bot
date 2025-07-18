@@ -1,19 +1,23 @@
-const {
+import {
+    ModalSubmitInteraction,
     ModalBuilder,
     ButtonBuilder,
     ButtonStyle,
     TextInputBuilder,
     TextInputStyle,
     ActionRowBuilder,
-} = require("discord.js");
-const { getConfig } = require("./configLoader.js");
+    ButtonInteraction,
+    UserManager,
+} from "discord.js";
+
+import { getConfig } from "./configLoader";
 
 const savedModalInteractions = new Map();
 const savedModals = new Map();
 
-const getModals = () => savedModals;
+export const getModals = () => savedModals;
 
-function saveModalData(interaction) {
+export function saveModalData(interaction: ModalSubmitInteraction) {
     savedModalInteractions.set(interaction.customId, [
         interaction.user.id,
         interaction.fields,
@@ -23,9 +27,9 @@ function saveModalData(interaction) {
     );
 }
 
-waitingForUnlock = false;
+let waitingForUnlock = false;
 
-async function rebuildModals(users) {
+export async function rebuildModals(users: UserManager) {
     // Resend all stored modals to the clients
     console.log(
         `[HOT-RELOAD] | Bot has finished reloading. Sending back saved modals.`,
@@ -41,7 +45,7 @@ async function rebuildModals(users) {
         // Add all the fields back to the modal
         for (const [key, value] of fields.fields.entries()) {
             modal.addComponents(
-                new ActionRowBuilder().addComponents(
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
                     new TextInputBuilder()
                         .setCustomId(key)
                         .setLabel(key)
@@ -62,7 +66,7 @@ async function rebuildModals(users) {
             content:
                 "Hey, the bot has finished reloading. Click the button below to retrieve your filled form.",
             components: [
-                new ActionRowBuilder().addComponents(
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
                         .setCustomId(`resend_modal:${modalId}`)
                         .setLabel("Reopen Form")
@@ -75,7 +79,7 @@ async function rebuildModals(users) {
     savedModalInteractions.clear();
 }
 
-async function resendModal(interaction) {
+export async function resendModal(interaction: ButtonInteraction) {
     try {
         const modalId = interaction.customId.replace("resend_modal:", "");
         const modal = savedModals.get(modalId);
@@ -91,7 +95,7 @@ async function resendModal(interaction) {
     }
 }
 
-async function waitForUnlock(users, interval = 500) {
+export async function waitForUnlock(users: UserManager, interval = 500) {
     if (waitingForUnlock) return;
 
     waitingForUnlock = true;
@@ -106,11 +110,3 @@ async function waitForUnlock(users, interval = 500) {
         await new Promise((resolve) => setTimeout(resolve, interval));
     }
 }
-
-module.exports = {
-    getModals,
-    saveModalData,
-    rebuildModals,
-    waitForUnlock,
-    resendModal,
-};

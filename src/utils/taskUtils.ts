@@ -1,19 +1,23 @@
-function fakeParisTimeToUTC() {
+export function fakeParisTimeToUTC() {
     const now = new Date();
 
     // Get current paris offset (1 or 2 hours)
-    const parisOffset = now.toLocaleString('en-US', {
-        timeZone: "Europe/Paris",
-        timeZoneName: "short",
-    }).match(/GMT([+-]\d+)/)[1] * 60;
+    const match = now
+        .toLocaleString("en-US", {
+            timeZone: "Europe/Paris",
+            timeZoneName: "short",
+        })
+        .match(/GMT([+-]\d+)/);
 
-    return new Date(now.getTime() + (parisOffset * 60 * 1000));
+    let parisOffset = 0;
+    if (match && match[1]) parisOffset = Number(match[1]) * 60;
+
+    return new Date(now.getTime() + parisOffset * 60 * 1000);
 }
 
-function computeNextTimestamp(data) {
+export function computeNextTimestamp(data: any) {
     // Task deactivated or no repeats left
-    if (!data.activated || data.repeats === 0)
-        return undefined;
+    if (!data.activated || data.repeats === 0) return undefined;
 
     const now = fakeParisTimeToUTC();
 
@@ -46,9 +50,3 @@ function computeNextTimestamp(data) {
 
     throw new Error("No valid time or interval set.");
 }
-
-module.exports = {
-    fakeParisTimeToUTC,
-    computeNextTimestamp,
-};
-

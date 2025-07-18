@@ -1,2 +1,4 @@
+# DEPRECATED
 cls
-node --env-file=.env main.js
+npx tsc --watch
+docker compose up --build

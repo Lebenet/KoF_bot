@@ -136,7 +136,8 @@ dist
 .pnp.*
 
 # important bot data
-data/
+**/data/
 
 # temp files
-temp/
+**/temp/
+processes/*

@@ -1,17 +1,21 @@
 // Imports
-const fs = require("node:fs");
-const path = require("node:path");
-const { REST, Routes } = require("discord.js");
+import fs from "fs";
+import path from "path";
+import { REST, Routes } from "discord.js";
 
 // Dynamically loaded commands
 const commands = {
-    public: new Map(),
-    dev: new Map(),
+    public: new Map<string, any>(),
+    dev: new Map<string, any>(),
 };
 const publicDir = "./commands/public/";
 const devDir = "./commands/dev/";
 
-function unloadCommand(file, filePath, targetMap) {
+export function unloadCommand(
+    file: string,
+    filePath: string,
+    targetMap: Map<string, any>,
+) {
     // Delete command from require memory
     try {
         delete require.cache[require.resolve(filePath)];
@@ -24,8 +28,8 @@ function unloadCommand(file, filePath, targetMap) {
     targetMap.delete(file.replace(".js", ""));
 }
 
-function loadCommand(file, dir) {
-    const targetMap =
+export function loadCommand(file: string, dir: string) {
+    const targetMap: Map<string, any> | undefined =
         dir == devDir
             ? commands.dev
             : dir == publicDir
@@ -37,6 +41,7 @@ function loadCommand(file, dir) {
         console.warn(
             `[WARNING] | HOT-RELOAD: Failed to load command ${name}, dir ${dir} unknown.`,
         );
+        return;
     }
     const filePath = path.resolve(path.join(dir, file));
     console.log(filePath, file, dir);
@@ -55,7 +60,7 @@ function loadCommand(file, dir) {
                 `[HOT-RELOAD] | [WARN] Command ${name} missing "data" or "execute" fields.`,
             );
         }
-    } catch (err) {
+    } catch (err: any) {
         console.error(
             `[HOT-RELOAD] | [ERROR] Failed to load command ${name}:\n`,
             err,
@@ -63,7 +68,7 @@ function loadCommand(file, dir) {
         // TODO: implement reloading old behaviour
     }
 }
-function initCmdLoad() {
+export function initCmdLoad() {
     // Load public commands
     fs.readdirSync(publicDir)
         .filter((file) => file.endsWith(".js"))
@@ -75,7 +80,7 @@ function initCmdLoad() {
         .forEach((file) => loadCommand(file, devDir));
 }
 
-const getGuildCommands = (guildId) => {
+export const getGuildCommands = (guildId: string) => {
     switch (guildId) {
         case process.env.DEV_GUILD_ID:
             return commands.dev;
@@ -85,28 +90,34 @@ const getGuildCommands = (guildId) => {
             console.warn(
                 `[WARN] | Member of an unauthorized server tried to execute a command. Guild ID: ${guildId}`,
             );
-            return new Map();
+            return new Map<string, any>();
     }
 };
 
-const getCommands = () => commands;
-const getSlashCommands = (cmds) => new Map(
-    [...cmds].filter(([_k, c]) => typeof c.execute === "function"));
-const getCommandsArray = (cmds) =>
-    [...cmds.values().map((cmd) => cmd.data.toJSON())];
+export const getCommands = () => commands;
+export const getSlashCommands = (cmds: Map<string, any>) =>
+    new Map([...cmds].filter(([_k, c]) => typeof c.execute === "function"));
+export const getCommandsArray = (cmds: Map<string, any>) => [
+    ...cmds.values().map((cmd) => cmd.data.toJSON()),
+];
 
 // Set REST API
-const rest = new REST().setToken(process.env.BOT_TOKEN);
+const rest = new REST().setToken(process.env.BOT_TOKEN ?? "");
 
 // Sends slash commands to discord
-async function sendCommands(guildId) {
+export async function sendCommands(guildId: string) {
     try {
         console.log("Started refreshing application (/) commands.");
 
         await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
+            Routes.applicationGuildCommands(
+                process.env.CLIENT_ID ?? "",
+                guildId,
+            ),
             {
-                body: getCommandsArray(getSlashCommands(getGuildCommands(guildId))),
+                body: getCommandsArray(
+                    getSlashCommands(getGuildCommands(guildId)),
+                ),
             },
         );
 
@@ -118,14 +129,3 @@ async function sendCommands(guildId) {
         );
     }
 }
-
-module.exports = {
-    initCmdLoad,
-    unloadCommand,
-    loadCommand,
-    getCommands,
-    getSlashCommands,
-    getCommandsArray,
-    getGuildCommands,
-    sendCommands,
-};
