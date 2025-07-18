@@ -1,13 +1,13 @@
-async function timedTask(_data, ctx) {
-    console.log(`Hello i am a timed task from guild ${ctx.bot.guilds.cache.get(ctx.data.guildId)}`);
+async function timedTask(data, ctx) {
+    console.log(`Hello i am a timed task from guild ${ctx.bot.guilds.cache.get(data.guildId)}`);
 }
 
 module.exports = {
     data: {
         name: "Timed Task",
         interval: null, // interval in minutes
-        time: ["17:20", "17:21", "17:22", "17:23", "17:24", "17:25"], // tod to activate it, format "HH:MM" (can be an array)
-        autoStart: true, // task will auto activate on every bot startup if true
+        time: ["12:32", "12:33", "12:34", "12:35", "12:36", "12:37", "12:38", "12:39", "12:40", "12:41", "12:42"], // tod to activate it, format "HH:MM" (can be an array)
+        autostart: true, // task will auto activate on every bot startup if true
         repeat: 5 // 0 means infinite, once all repetitions are done, will need to be manually reactivated
     },
     run: timedTask

@@ -1,9 +1,21 @@
+function fakeParisTimeToUTC() {
+    const now = new Date();
+
+    // Get current paris offset (1 or 2 hours)
+    const parisOffset = now.toLocaleString('en-US', {
+        timeZone: "Europe/Paris",
+        timeZoneName: "short",
+    }).match(/GMT([+-]\d+)/)[1] * 60;
+
+    return new Date(now.getTime() + (parisOffset * 60 * 1000));
+}
+
 function computeNextTimestamp(data) {
     // Task deactivated or no repeats left
     if (!data.activated || data.repeats === 0)
         return undefined;
 
-    const now = new Date();
+    const now = fakeParisTimeToUTC();
 
     if (data.time) {
         // Handle both string and array of strings
@@ -28,7 +40,7 @@ function computeNextTimestamp(data) {
 
         return target.getTime();
     } else if (data.interval) {
-        // No time specified: fallback to now + interval
+        // now + interval
         return now.getTime() + data.interval * 60 * 1000;
     }
 
@@ -36,6 +48,7 @@ function computeNextTimestamp(data) {
 }
 
 module.exports = {
+    fakeParisTimeToUTC,
     computeNextTimestamp,
 };
 
