@@ -3,13 +3,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {
-    initLoad,
+    initCmdLoad,
     unloadCommand,
     loadCommand,
     sendCommands,
     getCommands,
     getGuildCommands,
 } = require("./commandLoader.js");
+
 const {
     loadConfig,
     addSingleConfig,
@@ -19,12 +20,53 @@ const {
     deleteSingleConfig,
 } = require("./configLoader.js");
 
+const {
+    initTaskLoad,
+    unloadTask,
+    loadTask,
+    getTasks,
+    getGuildTasks,
+} = require("./taskLoader.js");
+
 const folders = {
-    [path.join("commands", "dev")]: "./commands/dev/",
-    [path.join("commands", "public")]: "./commands/public/",
+    commands: {
+        [path.join("commands", "dev")]: "./commands/dev/",
+        [path.join("commands", "public")]: "./commands/public/",
+    },
+    tasks: {
+        [path.join("tasks", "dev")]: "./tasks/dev/",
+        [path.join("tasks", "public")]: "./tasks/public/",
+    },
 };
 
-async function getFileDir(filePath) {
+function taskWatcherHandler(filePath, event) {
+    const { file, dir } = getFileDir(filePath);
+    if (!file || !dir) {
+        console.error(
+            `[ERROR] WatcherTask ${event}: failed to extract filename and dir from filePath: ${filePath}`,
+        );
+        return;
+    }
+
+    switch (event) {
+        case "add":
+        case "change":
+            loadTask(file, folders.tasks[dir]);
+            break;
+        case "unlink":
+            const guild_id = getGuildId(dir);
+            unloadTask(file, filePath, getGuildTasks(guild_id));
+            break;
+        default:
+            console.log(`[WARN] Task Watcher: Unhandled event ${event}.`);
+    }
+
+    console.log(getTasks());
+
+    console.log(`[WATCHER](Task) ${event}${event === "change" ? "" : "e"}d: ${filePath}`);
+}
+
+function getFileDir(filePath) {
     const file = path.basename(filePath);
     const dir = path.dirname(filePath);
     console.log(file, dir); // FIXME: TO TEST
@@ -48,15 +90,31 @@ function start() {
     console.log("config:\n", config);
 
     // Load commands
-    initLoad();
+    initCmdLoad();
     const commands = getCommands();
     console.log("commands:\n", commands);
 
     // Register slash commands to discord
     sendCommands(process.env.DEV_GUILD_ID);
-    // sendCommands(process.env.GUILD_ID);
+    sendCommands(process.env.GUILD_ID);
 
-    // TODO: Routines (& other) Watcher
+    // Load tasks
+    initTaskLoad()
+    const tasks = getTasks();
+    console.log("Tasks:\n", tasks);
+
+    const watcherTask = chokidar.watch(
+        ["./tasks/public/", "./tasks/dev/"],
+        {
+            persistent: true, // runs as long as the bot is up
+            ignoreInitial: true, // ignore initial files
+            ignored: (filePath, stats) =>
+                stats?.isFile() && !filePath.endsWith(".js"), // only watch .js files
+            usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
+            interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
+        },
+    );
+
     const watcherCmd = chokidar.watch(
         ["./commands/public/", "./commands/dev/"],
         {
@@ -65,7 +123,7 @@ function start() {
             ignored: (filePath, stats) =>
                 stats?.isFile() && !filePath.endsWith(".js"), // only watch .js files
             usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
-            interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 100, // ms
+            interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
         },
     );
 
@@ -75,15 +133,21 @@ function start() {
         ignored: (filePath, stats) =>
             stats?.isFile() && !filePath.endsWith(".json"),
         usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
-        interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 100, // ms
+        interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
     });
 
+    watcherTask
+        .on("add", (filePath) => { taskWatcherHandler(filePath, "add") })
+        .on("change", (filePath) => { taskWatcherHandler(filePath, "change") })
+        .on("unlink", (filePath) => { taskWatcherHandler(filePath, "unlink") });
+
+
     watcherCmd
-        .on("add", async (filePath) => {
+        .on("add", (filePath) => {
             // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
             lockBot();
 
-            const { file, dir } = await getFileDir(filePath);
+            const { file, dir } = getFileDir(filePath);
             if (!file || !dir) {
                 console.error(
                     `[ERROR] | WatcherCmd add: failed to extract filename and dir from filePath: ${filePath}`,
@@ -92,7 +156,7 @@ function start() {
             }
 
             const guild_id = getGuildId(dir);
-            loadCommand(file, folders[dir]);
+            loadCommand(file, folders.commands[dir]);
             sendCommands(guild_id);
             console.log(getCommands());
 
@@ -101,11 +165,11 @@ function start() {
             // Unlock bot once hot-reload is complete
             unlockBot();
         })
-        .on("change", async (filePath) => {
+        .on("change", (filePath) => {
             // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
             lockBot();
 
-            const { file, dir } = await getFileDir(filePath);
+            const { file, dir } = getFileDir(filePath);
             if (!file || !dir) {
                 console.error(
                     `[ERROR] | WatcherCmd change: failed to extract filename and dir from filePath: ${filePath}`,
@@ -114,7 +178,7 @@ function start() {
             }
 
             const guild_id = getGuildId(dir);
-            loadCommand(file, folders[dir]);
+            loadCommand(file, folders.commands[dir]);
             sendCommands(guild_id);
             console.log(getCommands());
 
@@ -123,11 +187,11 @@ function start() {
             // Unlock bot once hot-reload is complete
             unlockBot();
         })
-        .on("unlink", async (filePath) => {
+        .on("unlink", (filePath) => {
             // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
             lockBot();
 
-            const { file, dir } = await getFileDir(filePath);
+            const { file, dir } = getFileDir(filePath);
             if (!file || !dir) {
                 console.error(
                     `[ERROR] | WatcherCmd unlink: failed to extract filename and dir from filePath: ${filePath}`,
@@ -147,10 +211,10 @@ function start() {
         });
 
     watcherCfg
-        .on("add", async (filePath) => {
+        .on("add", (filePath) => {
             lockBot();
 
-            const { file, dir } = await getFileDir(filePath);
+            const { file, dir } = getFileDir(filePath);
             if (!file || !dir) {
                 console.error(
                     `[ERROR] | WatcherCfg add: failed to extract filename and dir from filePath: ${filePath}`,
@@ -163,10 +227,10 @@ function start() {
 
             unlockBot();
         })
-        .on("change", async (filePath) => {
+        .on("change", (filePath) => {
             lockBot();
 
-            const { file, dir } = await getFileDir(filePath);
+            const { file, dir } = getFileDir(filePath);
             if (!file || !dir) {
                 console.error(
                     `[ERROR] | WatcherCfg change: failed to extract filename and dir from filePath: ${filePath}`,
@@ -179,10 +243,10 @@ function start() {
 
             unlockBot();
         })
-        .on("unlink", async (filePath) => {
+        .on("unlink", (filePath) => {
             lockBot();
 
-            const { file, dir } = await getFileDir(filePath);
+            const { file, dir } = getFileDir(filePath);
             if (!file || !dir) {
                 console.error(
                     `[ERROR] | WatcherCfg unlink: failed to extract filename and dir from filePath: ${filePath}`,
