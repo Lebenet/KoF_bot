@@ -1,23 +1,30 @@
 // Imports
-// const fs = require("node:fs");
-// const path = require("node:path");
+const fs = require("node:fs");
+const path = require("node:path");
+
 const {
     Client,
     Events,
     GatewayIntentBits,
     MessageFlags,
 } = require("discord.js");
+
 const { start } = require("./utils/watcher.js");
+
 const {
     getSlashCommands,
     getGuildCommands,
 } = require("./utils/commandLoader.js");
+
 const { getConfig } = require("./utils/configLoader.js");
+
 const {
     saveModalData,
     waitForUnlock,
     resendModal,
 } = require("./utils/modalSaver.js");
+
+const { setClient, startTaskRunner } = require("./utils/taskRunner.js");
 
 // Load discord bot token from .env
 require("dotenv").config();
@@ -27,13 +34,23 @@ const token = process.env.BOT_TOKEN;
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.once(Events.ClientReady, (readyClient) => {
     console.log(`Bot ready. Currently logged in as ${readyClient.user.tag}`);
+    setClient(client);
 });
 
 // Log in to bot client
 client.login(token);
 
+// Ensure temp dir exists
+if (!fs.existsSync(path.resolve("temp/")))
+    fs.mkdirSync("temp/");
+
 // Start watcher
+console.log(`[STARTUP] Starting watcher...`);
 start();
+
+// Start task runner
+console.log(`[STARTUP] Starting task runner...`);
+startTaskRunner();
 
 async function handleDeferredReply(interaction, content, flags) {
     if (interaction.replied || interaction.deferred) {
@@ -60,9 +77,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         // Get the correct command using guildId and the command name
-        const commands = getSlashCommands(
-            getGuildCommands(interaction.guildId),
-        );
+        const commands = getSlashCommands(getGuildCommands(interaction.guildId));
         if (commands.size === 0) {
             console.warn(
                 `[WARN] | Execute: Unauthorized guild command execution from user ${interaction.user.username(interaction.user.id)}.`,

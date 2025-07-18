@@ -137,3 +137,6 @@ dist
 
 # important bot data
 data/
+
+# temp files
+temp/

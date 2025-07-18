@@ -1,13 +1,15 @@
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 
 /*
-Command to publish a test command to prod
+Command to publish a test command|task to prod
 Requires bot admin
 */
+
+const dirName = (type) => { ["command", "task"].includes(type) ? type + "s" : undefined };
 
 async function publish(interaction, config) {
     try {
@@ -15,7 +17,7 @@ async function publish(interaction, config) {
         await interaction.deferReply();
 
         // Check user has sufficient permissions
-        if (!config.admins.includes(interaction.member.user.id)) {
+        if (!config.admins || !config.admins.includes(interaction.member.user.id)) {
             await interaction.editReply({
                 content: `Only bot admins can use this command.`,
                 flags: MessageFlags.Ephemeral,
@@ -23,49 +25,59 @@ async function publish(interaction, config) {
             return;
         }
 
+        // Get the correct directory
+        const dir = dirName(interaction.options.getString("type"));
+        if (!dir) {
+            await interaction.editReply({
+                content: `This type isn't publishable.`,
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
+        }
+        
         // Get the file from the command arg
-        const cmd = interaction.options.getString("command");
-        const file = path.resolve(`commands/dev/${cmd}.js`);
+        const name = interaction.options.getString("name");
+        const file = path.resolve(`./${dir}/dev/${name}.js`);
 
         // Check if the file exists
         try {
             await fsp.access(file, fs.constants.F_OK);
         } catch (err) {
             console.error(
-                `[ERROR] | Publish: File ${file} does not exist: \n`,
+                `[ERROR] | publish: File ${file} does not exist: \n`,
                 err,
             );
             await interaction.editReply({
-                content: `Command **\`/${cmd}\`** does not exist.`,
+                content: `Command|Task **\`/${name}\`** does not exist.`,
                 flags: MessageFlags.Ephemeral,
             });
             return;
         }
 
-        // Copy to /commands/
-        const dst = path.resolve(`./commands/public/${cmd}.js`);
+        // Copy to dir
+        const dst = path.resolve(`./${dir}/public/${name}.js`);
         fs.copyFile(file, dst, async (err) => {
             if (err) {
                 console.error(
-                    `[ERROR] | Publish: An error occured while publishing ${cmd} command:\n`,
+                    `[ERROR] | publish: An error occured while publishing ${name} command|task:\n`,
                     err,
                 );
                 await interaction.editReply({
-                    content: `Error while publishing **\`/${cmd}\`** command.`,
+                    content: `Error while publishing **\`/${name}\`** command|task.`,
                     flags: MessageFlags.Ephemeral,
                 });
             } else {
                 console.log(
-                    `[COMMANDS] | Publish: Succesfully published the ${cmd} command.`,
+                    `[COMMANDS] | publish: Succesfully published the ${name} command|task.`,
                 );
                 await interaction.editReply({
-                    content: `Succesfully published the **\`/${cmd}\`** command.`,
+                    content: `Succesfully published the **\`/${name}\`** command|task.`,
                     flags: MessageFlags.Ephemeral,
                 });
             }
         });
     } catch (err) {
-        console.error("[ERROR] | Publish: Something went wrong:\n", err);
+        console.error("[ERROR] | publish: Something went wrong:\n", err);
         await interaction.editReply({
             content: "Something went wrong.",
             flags: MessageFlags.Ephemeral,
@@ -76,11 +88,17 @@ async function publish(interaction, config) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("publish")
-        .setDescription("Makes a dev-only command public")
+        .setDescription("Makes a dev-only command|task public")
         .addStringOption((option) =>
             option
-                .setName("command")
-                .setDescription("Name of the command you wish to publish")
+                .setName("type")
+                .setDescription("Type (command|task)")
+                .setRequired(true)
+        )
+        .addStringOption((option) =>
+            option
+                .setName("name")
+                .setDescription("Name of what you wish to publish")
                 .setRequired(true),
         ),
 
