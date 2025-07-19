@@ -15,7 +15,7 @@ Windows:
 ## Required:
 - Docker
 - npm
-  - npx
+  - npx *(automatically installed if npm v5.2.0 or above)*
 
-## Optional (for messing around with the DB outside the bot)
+## Optional *(for messing around with the DB outside the bot)*
 - SQLite3
