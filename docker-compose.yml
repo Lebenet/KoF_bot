@@ -9,4 +9,5 @@ services:
             - CHOKIDAR_USEPOLLING=true
         volumes:
             - ./dist:/usr/bot/dist
+            - ./db:/usr/bot/dist/db
         restart: unless-stopped
