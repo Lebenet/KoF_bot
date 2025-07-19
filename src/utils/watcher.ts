@@ -109,7 +109,7 @@ export function start() {
         persistent: true, // runs as long as the bot is up
         ignoreInitial: true, // ignore initial files
         ignored: (filePath, stats) =>
-            (stats?.isFile() ?? true) && !filePath.endsWith(".js"), // only watch .js files
+            (stats?.isFile() ?? false) && !filePath.endsWith(".js"), // only watch .js files
         usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
         interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
     });
@@ -120,7 +120,7 @@ export function start() {
             persistent: true, // runs as long as the bot is up
             ignoreInitial: true, // ignore initial files
             ignored: (filePath, stats) =>
-                (stats?.isFile() ?? true) && !filePath.endsWith(".js"), // only watch .js files
+                (stats?.isFile() ?? false) && !filePath.endsWith(".js"), // only watch .js files
             usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
             interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
         },
@@ -130,7 +130,7 @@ export function start() {
         persistent: true,
         ignoreInitial: true,
         ignored: (filePath, stats) =>
-            (stats?.isFile() ?? true) && !filePath.endsWith(".json"),
+            (stats?.isFile() ?? false) && !filePath.endsWith(".json"),
         usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
         interval: Number(process.env.CHOKIDAR_POLL_INTERVAL) || 1000, // ms
     });
