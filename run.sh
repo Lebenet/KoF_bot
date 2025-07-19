@@ -13,8 +13,8 @@ npx tsc --watch &
 # Save PID to stop the process when necessary
 echo $! > processes/bot_tsc_watcher
 
-# Send .env file over
-cp .env dist/.env
+# Send .env file & bot data over
+cp .env src/data dist/
 
 mkdir -p dist/commands/public dist/commands/dev dist/tasks/public dist/tasks/dev dist/data dist/temp
 
