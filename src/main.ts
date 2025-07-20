@@ -26,11 +26,14 @@ import { start } from "./utils/watcher";
 
 import { getSlashCommands, getGuildCommands } from "./utils/commandLoader";
 
-import { getConfig } from "./utils/configLoader";
+import { getConfig, setDb } from "./utils/configLoader";
 
 import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
 
 import { setClient, startTaskRunner } from "./utils/taskRunner";
+
+import { db } from "./db/dbConn";
+setDb(db);
 
 // Load discord bot token from .env
 require("dotenv").config();

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { exit } from "process";
+import Database from "better-sqlite3";
 
 /*
 // Files to read
@@ -89,3 +90,5 @@ export function loadConfig(
 }
 
 export const getConfig = () => config;
+
+export const setDb = (db: Database.Database) => (config.db = db);
