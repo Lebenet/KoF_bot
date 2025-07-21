@@ -10,17 +10,18 @@ export type DbOptions = {
         | number
         | bigint
         | string
-        | boolean
+		| boolean
         | Date
         | null;
     table?: string | null;
     limit?: number | bigint | string | null;
+	array?: boolean | null;
 };
 
 class Model {
     [key: string]: any;
 
-    private _inserted: boolean = false;
+	private _inserted: boolean = false;
 
     get name(): string {
         return this.constructor.name;
@@ -36,12 +37,9 @@ class Model {
 
     private static _primaryKeysCache: Map<string, string[]> = new Map();
 
-    private static isSafeDBValue(v: any): boolean {
-        return (
-            ["number", "bigint", "string", "boolean"].includes(typeof v) ||
-            v instanceof Date
-        );
-    }
+	private static isSafeDBValue(v: any): boolean {
+		return ["number", "bigint", "string", "boolean"].includes(typeof v) || v instanceof Date
+	}
 
     public static getPrimaryKeys(table: string): string[] {
         if (!Model._primaryKeysCache.has(table)) {
@@ -114,16 +112,16 @@ class Model {
         const rows: unknown[] = this.selectQuery(options);
 
         // Build instances
-        if (!rows || rows.length === 0) return null;
+        if (!rows || rows.length === 0) return options && options.array ? [] : null;
         const instances: InstanceType<T>[] = rows.map((row) => {
             const inst = new this() as InstanceType<T>;
             inst.assign(row);
 
-            // Mark it as inserted (to avoid errors)
-            inst._inserted = true;
+			// Mark it as inserted (to avoid errors)
+			inst._inserted = true;
             return inst;
         });
-
+		if (options && options.array) return instances;
         return instances.length === 1 ? instances[0] : instances;
     }
 
@@ -144,134 +142,239 @@ class Model {
         });
 
         if (row && row.length > 0) {
-            this.assign(row[0]);
-            return true;
-        }
+			this.assign(row[0]);
+			return true;
+		}
         return false;
     }
 
     // Update database with new data of this new instance
     public update(): boolean {
-        const table = this.table;
+		const table = this.table;
 
-        // Set keys
-        // Primary keys (fetched from DB)
-        const pks: string[] = Model.getPrimaryKeys(table);
-        if (pks.length === 0) return false;
+		// Set keys
+		// Primary keys (fetched from DB)
+		const pks: string[] = Model.getPrimaryKeys(table);
+		if (pks.length === 0)
+			return false;
 
-        // Unsafe or virtual user-defined fields
-        const rawUks: string[] = Object.keys(this).filter(
-            (k: string): boolean =>
-                typeof this[k] != "function" &&
-                !pks.includes(k) &&
-                !k.startsWith("_") &&
-                !["table", "name", "ctor"].includes(k),
-        );
-        // Validated fields
-        const uks: string[] = [];
+		// Unsafe or virtual user-defined fields
+		const rawUks: string[] = Object.keys(this).filter(
+			(k: string): boolean => 
+				typeof this[k] != "function"
+				&& !pks.includes(k)
+				&& !k.startsWith("_")
+				&& !["table", "name", "ctor"].includes(k)
+		);
+		// Validated fields
+		const uks: string[] = [];
 
-        // Set values arrays
-        // Primary keys values (WHERE clause)
-        const pkValues = pks.map((k: string): any => this[k]);
-        if (pkValues.some((v) => !Model.isSafeDBValue(v))) return false;
+		// Set values arrays
+		// Primary keys values (WHERE clause)
+		const pkValues = pks.map((k: string): any => this[k]);
+		if (pkValues.some(v => !Model.isSafeDBValue(v))) return false;
 
-        // Non-primary keys values (SET clause)
-        const values: any[] = [];
-        rawUks.forEach((k: string): void => {
-            const v: any = this[k];
-            if (Model.isSafeDBValue(v)) {
-                uks.push(k);
-                values.push(v);
-            }
-        });
+		// Non-primary keys values (SET clause)
+		const values: any[] = [];
+		rawUks.forEach((k: string): void => {
+			const v: any = this[k];
+			if (Model.isSafeDBValue(v)){
+				uks.push(k);
+				// Convert booleans to 0 or 1 (no native support)
+				values.push(typeof v === "boolean" ? v ? "1" : "0" : v);
+			}
+		});
 
-        // Safeguard (if somehow something weird happens ?)
-        if (
-            pks.length != pkValues.length ||
-            pks.length === 0 ||
-            uks.length != values.length ||
-            uks.length == 0
-        )
-            return false;
+		// Safeguard (if somehow something weird happens ?)
+		if (pks.length != pkValues.length || pks.length === 0 || uks.length != values.length || uks.length == 0)
+			return false;
+		
+		// Build SET clause
+		const setClause: string = uks.map((k: string): string => `${k} = ?`).join(", ");
 
-        // Build SET clause
-        const setClause: string = uks
-            .map((k: string): string => `${k} = ?`)
-            .join(", ");
+		// Build WHERE clause
+		const whereClause: string = pks.map((k: string): string => `${k} = ?`).join(" AND ");
 
-        // Build WHERE clause
-        const whereClause: string = pks
-            .map((k: string): string => `${k} = ?`)
-            .join(" AND");
-
-        const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
-        try {
-            const res: Database.RunResult = db
-                .prepare(sql)
-                .run(...values, ...pkValues);
-            return res.changes === 1;
-        } catch (err) {
-            console.error(`[DB] Update: something went wrong\n`, err);
-            return false;
-        }
-    }
+		const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
+		try {
+			const res: Database.RunResult = db.prepare(sql).run(...values, ...pkValues);
+			return res.changes === 1;
+		} catch (err) {
+			console.error(`[DB] Update: something went wrong\n`, err);
+			return false;
+		}
+	}
 
     // Create a new row in the corresponding table, and returns the associated instance
     public insert(): this | undefined {
-        if (this._inserted) return this; // Can only insert once (Primary Unique Key Constraint)
-        const table = this.table;
+		if (this._inserted) return this; // Can only insert once (Primary Unique Key Constraint)
+		const table = this.table;
 
-        // All insertable fields
-        const rawFields = Object.keys(this).filter(
-            (k: string): boolean =>
-                typeof this[k] !== "function" &&
-                !k.startsWith("_") &&
-                !["table", "name", "ctor"].includes(k),
-        );
+		// All insertable fields
+		const rawFields = Object.keys(this).filter(
+			(k: string): boolean =>
+				typeof this[k] !== "function"
+			&& !k.startsWith("_")
+			&& !["table", "name", "ctor"].includes(k)
+		);
 
-        const fields: string[] = [];
-        const values: any[] = [];
+		const fields: string[] = [];
+		const values: any[] = [];
 
-        // Validate values
-        for (const key of rawFields) {
-            const val = this[key];
-            if (Model.isSafeDBValue(val)) {
-                fields.push(key);
-                values.push(val);
-            }
-        }
+		// Validate values
+		for (const key of rawFields) {
+			const val = this[key];
+			if (Model.isSafeDBValue(val)) {
+				fields.push(key);
+				// Convert booleans to 0 or 1 (no native support)
+				values.push(typeof val === "boolean" ? val ? "1" : "0" : val);
+			}
+		}
 
-        if (fields.length === 0 || values.length !== fields.length) return;
+		if (fields.length === 0 || values.length !== fields.length)
+			return;
 
-        const placeholders = fields.map(() => "?").join(", ");
-        const columns = fields.join(", ");
+		const placeholders = fields.map(() => "?").join(", ");
+		const columns = fields.join(", ");
 
-        const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
+		const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
 
-        try {
-            const res: Database.RunResult = db.prepare(sql).run(...values);
-            this._inserted = true;
-            return res.changes === 1 ? this : undefined;
-        } catch (err) {
-            console.error(`[DB] Insert: something went wrong\n`, err);
-            return;
-        }
+		try {
+			const res: Database.RunResult = db.prepare(sql).run(...values);
+			this._inserted = true;
+			return res.changes === 1 ? this : undefined;
+		} catch (err) {
+			console.error(`[DB] Insert: something went wrong\n`, err);
+			return;
+		}
     }
+
+	// Remove entry from database
+	public delete(): boolean {
+		const table = this.table;
+
+		// Delete based on primary keys
+		const pks: string[] = Model.getPrimaryKeys(table);
+		const values: any[] = [];
+		pks.forEach((k: string): any => {
+			const v: any = this[k];
+			if (Model.isSafeDBValue(v))
+				values.push(typeof v === "boolean" ? v ? "1" : "0" : v);
+		});
+
+		// Safeguard (if user did some wonky stuff with the class attributes)
+		if (pks.length === 0 || pks.length != values.length)
+			return false;
+
+		const whereClause: string = pks.map((k: string): string => `${k} = ?`).join(" AND ");
+		const sql: string = `DELETE FROM ${table} WHERE ${whereClause}`;
+		try {
+			const res: Database.RunResult = db.prepare(sql).run(...values);
+			return res.changes > 0;
+		} catch (err) {
+			console.error(`[DB] Delete: something went wrong\n`, err);
+			return false;
+		}
+	}
 }
 
 export class User extends Model {
     public id!: string | bigint;
     public username?: string | undefined;
-    public bot_perm?: number | string | undefined;
+	public bot_perm?: number | string | undefined;
+
+	public static ensureUserExists(userId: string, username: string, botPerm: number | bigint = 0) {
+		db.prepare(`
+			INSERT INTO Users(id, username, bot_perm)
+			VALUES (?, ?, ?)
+			ON CONFLICT(id) DO NOTHING;
+		`).run(userId, username, botPerm);
+	}
 }
 
 export class ChannelParam extends Model {
-    public chan_id!: string | bigint;
-    public guild_id!: string | bigint;
-    public command_name!: string;
-    public command_param!: string;
+	public channel_id!: string | bigint;
+	public guild_id!: string | bigint;
+	public command_name!: string;
+	public command_param!: string;
 
-    public toString(): string {
-        return `${this.command_name}(${this.command_param}): Channel ${this.chan_id} from Guild ${this.guild_id}`;
-    }
+	public toString(): string {
+		return `${this.command_name}(${this.command_param}): Channel ${this.channel_id} from Guild ${this.guild_id}`;
+	}
 }
+
+export class Profession extends Model {
+	public p_name!: string;
+	public description!: string;
+
+	public toString(): string {
+		return this.p_name;
+	}
+}
+
+export class Fournisseur extends Model {
+	public user_id!: string;
+	public guild_id!: string;
+	public coordinator!: boolean;
+	public profession_name!: string;
+}
+/*
+// Add professions
+for (const [n, d] of [
+	["Forestry", "Bûcheron"],
+	["Carpentry", "Charpentier"],
+	["Masonry", "Maçon"],
+	["Mining", "Mineur"],
+	["Smithing", "Forgeron"],
+	["Scholar", "Savant"],
+	["Leatherworking", "Tanneur"],
+	["Hunting", "Chasseur"],
+	["Tailoring", "Tisserand"],
+	["Farming", "Fermier"],
+	["Fishing", "Pêcheur"],
+	["Cooking", "Cuistot"],
+	["Foraging", "Ramasseur"],
+	["Construction", "Construction"],
+	["Taming", "Eleveur"],
+	["Slayer", "Massacreur"],
+	["Merchanting", "Marchand"],
+	["Sailing", "Navigateur"],
+]) {
+	const p = new Profession();
+	p.p_name = n;
+	p.description = d;
+	p.insert();
+}
+*/
+
+/*
+
+const chanParam = new ChannelParam();
+chanParam.channel_id = "1396511696859693087";
+chanParam.guild_id = "877114572337725441";
+chanParam.command_name = "test_chan_param";
+chanParam.command_param = "param1";
+chanParam.insert();
+
+const chanParam1 = new ChannelParam();
+chanParam1.channel_id = "22222222";
+chanParam1.guild_id = "877114572337725441";
+chanParam1.command_name = "test_chan_param";
+chanParam1.command_param = "param2";
+chanParam1.insert();
+
+const chanParam2 = new ChannelParam();
+chanParam2.channel_id = "1396511696859693087";
+chanParam2.guild_id = "877114572337725441";
+chanParam2.command_name = "test_chan_param_numero2";
+chanParam2.command_param = "param1";
+chanParam2.insert();
+
+const chanParam3 = new ChannelParam();
+chanParam3.channel_id = "1234";
+chanParam3.guild_id = "12345";
+chanParam3.command_name = "etst2";
+chanParam3.command_param = "test";
+chanParam3.insert();
+
+*/
