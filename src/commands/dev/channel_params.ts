@@ -3,7 +3,7 @@ import {
     ChatInputCommandInteraction,
     MessageFlags,
 } from "discord.js";
-import { ChannelParam } from "../../db/dbTypes";
+import { ChannelParam, DbOptions } from "../../db/dbTypes";
 
 async function channelParams(
     interaction: ChatInputCommandInteraction,
@@ -19,10 +19,32 @@ async function channelParams(
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const command_name = interaction.options.getString("command_name") ?? "";
-    const options = command_name
-        ? { keys: "command_name", values: command_name }
+    const commandName: string =
+        interaction.options.getString("command_name") ?? "";
+    const channelId: string = interaction.options.getString("channel_id") ?? "";
+    const guildId: string =
+        interaction.options.getString("guild_id") ??
+        interaction.guild?.id ??
+        interaction.guildId ??
+        "";
+    const keys: string[] = [];
+    const values: string[] = [];
+    if (commandName) {
+        keys.push("command_name");
+        values.push(commandName);
+    }
+    if (channelId) {
+        keys.push("channel_id");
+        values.push(channelId);
+    }
+    if (guildId) {
+        keys.push("guild_id");
+        values.push(guildId);
+    }
+    const options: DbOptions | null = keys.length
+        ? { keys: keys, values: values }
         : null;
+
     let params = ChannelParam.fetch(options);
 
     if (!params) {
@@ -45,7 +67,23 @@ module.exports = {
             option
                 .setName("command_name")
                 .setDescription(
-                    "Name of the command you want to see channel params of",
+                    "Name of the command you want to see channel command params of",
+                )
+                .setRequired(false),
+        )
+        .addStringOption((option) =>
+            option
+                .setName("channel_id")
+                .setDescription(
+                    "Id of the channel you want to see channel command params of",
+                )
+                .setRequired(false),
+        )
+        .addStringOption((option) =>
+            option
+                .setName("guild_id")
+                .setDescription(
+                    "Id of the guild you want to see channel command params of",
                 )
                 .setRequired(false),
         ),
