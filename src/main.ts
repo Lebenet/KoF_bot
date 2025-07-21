@@ -26,7 +26,7 @@ import { start } from "./utils/watcher";
 
 import { getSlashCommands, getGuildCommands } from "./utils/commandLoader";
 
-import { getConfig, setDb } from "./utils/configLoader";
+import { getConfig, setDb, setBot } from "./utils/configLoader";
 
 import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
 
@@ -49,11 +49,12 @@ const client = new Client({
 });
 client.once(Events.ClientReady, (readyClient) => {
     console.log(`Bot ready. Currently logged in as ${readyClient.user.tag}`);
-    setClient(client);
 });
 
 // Log in to bot client
 client.login(token);
+setClient(client); // Tasks
+setBot(client); // Commands
 
 // Ensure temp dir exists
 if (!fs.existsSync(path.resolve("temp/"))) fs.mkdirSync("temp/");

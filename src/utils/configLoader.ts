@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { exit } from "process";
 import Database from "better-sqlite3";
+import { Client } from "discord.js";
 
 /*
 // Files to read
@@ -92,3 +93,5 @@ export function loadConfig(
 export const getConfig = () => config;
 
 export const setDb = (db: Database.Database) => (config.db = db);
+
+export const setBot = (bot: Client) => (config.bot = bot);
