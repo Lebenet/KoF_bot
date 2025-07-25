@@ -1,5 +1,6 @@
 // UNFINISHED: simple ORM attempt
 
+import { Client } from "discord.js";
 import { db } from "./dbConn";
 import Database from "better-sqlite3";
 
@@ -82,9 +83,11 @@ class Model {
             const keys = Array.isArray(options.keys)
                 ? options.keys
                 : [options.keys];
-            values = Array.isArray(options.values)
+            values = (Array.isArray(options.values)
                 ? options.values
-                : [options.values];
+                : [options.values])
+				// Typeguard (sqlite doesn't support boolean)
+				.map((v) => typeof v === "boolean" ? v ? "1" : "0" : v);
 
             // Safeguard
             if (keys.length !== values.length || keys.length === 0)
@@ -96,6 +99,14 @@ class Model {
             whereStr += "WHERE";
             whereStr += keys.map((k: string) => ` ${k} = ?`).join(" AND");
         }
+
+		/*
+		console.log("==============");
+		console.log(this);
+		console.log(values);
+		values.forEach((v) => console.log(v, typeof v));
+		console.log("==============");
+		*/
 
         return db
             .prepare(`SELECT * FROM ${table} ${whereStr} ${limit}`)
@@ -134,18 +145,26 @@ class Model {
             (k: string): number | bigint | string | Date => this[k],
         );
 
-        const row: any[] = this.ctor.selectQuery({
-            keys: pks,
-            values: values,
-            table: table,
-            limit: 1,
-        });
+		try {
+			const row: any[] = this.ctor.selectQuery({
+				keys: pks,
+				values: values,
+				table: table,
+				limit: 1,
+			});
 
-        if (row && row.length > 0) {
-			this.assign(row[0]);
-			return true;
+			if (row && row.length > 0) {
+				this.assign(row[0]);
+				this._inserted = true;
+				return true;
+			}
+
+			return false;
+			
+		} catch (err) {
+			console.error(`[DB] Sync: Error in selectQuery:\n`, err);
+			return false;
 		}
-        return false;
     }
 
     // Update database with new data of this new instance
@@ -242,6 +261,11 @@ class Model {
 		try {
 			const res: Database.RunResult = db.prepare(sql).run(...values);
 			this._inserted = true;
+
+			if (Object.keys(this).includes("id") && !this["id"]) {
+				this["id"] = (db.prepare("SELECT last_insert_rowid()").get() as any)["last_insert_rowid()"];
+			}
+
 			return res.changes === 1 ? this : undefined;
 		} catch (err) {
 			console.error(`[DB] Insert: something went wrong\n`, err);
@@ -279,8 +303,10 @@ class Model {
 }
 
 export class User extends Model {
-    public id!: string | bigint;
+    public id!: string;
+	public player_id?: string | undefined;
     public username?: string | undefined;
+	public player_username?: string | undefined;
 	public bot_perm?: number | string | undefined;
 
 	public static ensureUserExists(userId: string, username: string, botPerm: number | bigint = 0) {
@@ -293,13 +319,13 @@ export class User extends Model {
 }
 
 export class ChannelParam extends Model {
-	public channel_id!: string | bigint;
-	public guild_id!: string | bigint;
+	public channel_id!: string;
+	public guild_id!: string;
 	public command_name!: string;
 	public command_param!: string;
 
 	public toString(): string {
-		return `${this.command_name}(${this.command_param}): Channel ${this.channel_id} from Guild ${this.guild_id}`;
+		return `${this.command_name}(${this.command_param}): Channel <#${this.channel_id}> from Guild ${this.guild_id}`;
 	}
 }
 
@@ -318,7 +344,54 @@ export class Fournisseur extends Model {
 	public coordinator!: boolean;
 	public profession_name!: string;
 }
-/*
+
+export class Skill extends Model {
+	public user_id!: string;
+	public xp?: number | bigint | string | undefined;
+	public level?: number | bigint | string | undefined;
+	public profession_name!: string;
+}
+
+export class Command extends Model {
+	public id!: number | bigint | string;
+	public guild_id!: string;
+	public thread_id!: string;
+	public message_id?: string | undefined;
+	public panel_message_id?: string | undefined;
+	public c_name!: string;
+	public chest?: string | undefined;
+	public description?: string | undefined;
+	public self_supplied: boolean = false;
+	public last_edited?: number | string | undefined;
+	public author_id!: string; 
+	public status?: string | undefined;
+}
+
+export class CommandItem extends Model {
+	public command_id!: number | bigint | string;
+	public item_name!: string;
+	public quantity: number = 1;
+}
+
+export class CommandProfession extends Model {
+	public command_id!: number | bigint | string;
+	public profession_name!: string;
+}
+
+export class CommandAssignee extends Model {
+	public command_id!: number | bigint | string;
+	public user_id!: string;
+}
+
+export type Config = {
+	locked: boolean;
+	bot: Client,
+	db: Database.Database,
+	admins: Array<string>,
+	[key: string]: any,
+}
+
+
 // Add professions
 for (const [n, d] of [
 	["Forestry", "Bûcheron"],
@@ -340,12 +413,19 @@ for (const [n, d] of [
 	["Merchanting", "Marchand"],
 	["Sailing", "Navigateur"],
 ]) {
+	db.prepare(`
+		INSERT INTO Professions(p_name, description)
+		VALUES (?, ?)
+		ON CONFLICT(p_name) DO NOTHING;
+	`).run(n, d);
+	/*
 	const p = new Profession();
 	p.p_name = n;
 	p.description = d;
 	p.insert();
+	*/
 }
-*/
+
 
 /*
 

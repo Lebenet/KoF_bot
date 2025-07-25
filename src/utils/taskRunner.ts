@@ -2,14 +2,8 @@ import { computeNextTimestamp, fakeParisTimeToUTC } from "./taskUtils";
 import { getTasks, deactivateTask } from "./taskLoader";
 import { getConfig } from "./configLoader";
 
-import { Client } from "discord.js";
-
 // "Global" Variables
-let refClient: Client | null = null;
 let intervalId: NodeJS.Timeout | null = null;
-
-// Setters
-export const setClient = (bot: Client) => (refClient = bot);
 
 export function startTaskRunner() {
     if (intervalId) return;
@@ -26,12 +20,7 @@ async function runTask(task: any) {
     try {
         const config = getConfig();
 
-        const ctx = {
-            config: config,
-            bot: refClient,
-        };
-
-        await task.run(task.data, ctx);
+        await task.run(task.data, config);
 
         // Handle repeated tasks
         if (task.data.repeats > 1) {
@@ -65,7 +54,7 @@ async function runTask(task: any) {
 }
 
 async function checker() {
-    if (!refClient || !intervalId) return;
+    if (!intervalId) return;
     const allTasks = getTasks();
 
     for (const [, tasks] of Object.entries(allTasks)) {

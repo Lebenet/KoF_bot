@@ -1,6 +1,6 @@
 import { Profession } from "../db/dbTypes";
 
-export function getProfessions(): any[] {
+export function getProfessionsStringSelectCommandArg(): any[] {
     const ps = Profession.fetch();
     if (!ps)
         return [
@@ -8,5 +8,19 @@ export function getProfessions(): any[] {
         ];
     return (Array.isArray(ps) ? ps : [ps]).map((p) => {
         return { name: p.description, value: p.p_name };
+    });
+}
+
+export function getProfessionsStringSelectMessageComp(): any[] {
+    const ps = Profession.fetch();
+    if (!ps)
+        return [
+            {
+                label: "error:no_profession_found",
+                value: "no_profession_found",
+            },
+        ];
+    return (Array.isArray(ps) ? ps : [ps]).map((p) => {
+        return { label: p.description, value: p.p_name };
     });
 }

@@ -7,7 +7,7 @@ import {
     MessageFlags,
 } from "discord.js";
 import { User, Fournisseur } from "../../db/dbTypes";
-import { getProfessions } from "../../utils/discordUtils";
+import { getProfessionsStringSelectCommandArg } from "../../utils/discordUtils";
 
 async function manageProvider(
     interaction: ChatInputCommandInteraction,
@@ -100,7 +100,7 @@ async function manageProvider(
                 values: [user.id, guildId],
                 array: true,
             }) as Fournisseur[];
-            console.log(provs, typeof provs, Array.isArray(provs));
+
             provs.sort((p1: Fournisseur, p2: Fournisseur): number =>
                 p1.coordinator < p2.coordinator ? 1 : -1,
             );
@@ -236,7 +236,7 @@ module.exports = {
                 .setName("profession")
                 .setDescription("Profession à lui assigner")
                 .setRequired(false)
-                .setChoices(getProfessions()),
+                .setChoices(getProfessionsStringSelectCommandArg()),
         )
         .addUserOption((option) =>
             option

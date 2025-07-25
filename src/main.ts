@@ -12,6 +12,7 @@ else if (!["KoF_bot", "dist"].includes(cwdShort))
     );
 
 import {
+    AnySelectMenuInteraction,
     ButtonInteraction,
     ChatInputCommandInteraction,
     Client,
@@ -20,6 +21,7 @@ import {
     Interaction,
     MessageFlags,
     ModalSubmitInteraction,
+    StringSelectMenuInteraction,
 } from "discord.js";
 
 import { start } from "./utils/watcher";
@@ -30,7 +32,7 @@ import { getConfig, setDb, setBot } from "./utils/configLoader";
 
 import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
 
-import { setClient, startTaskRunner } from "./utils/taskRunner";
+import { startTaskRunner } from "./utils/taskRunner";
 
 import { db } from "./db/dbConn";
 setDb(db);
@@ -44,6 +46,7 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.MessageContent,
     ],
 });
@@ -53,8 +56,7 @@ client.once(Events.ClientReady, (readyClient) => {
 
 // Log in to bot client
 client.login(token);
-setClient(client); // Tasks
-setBot(client); // Commands
+setBot(client); // Commands & tasks
 
 // Ensure temp dir exists
 if (!fs.existsSync(path.resolve("temp/"))) fs.mkdirSync("temp/");
@@ -71,14 +73,23 @@ async function handleDeferredReply(
     interaction:
         | ChatInputCommandInteraction
         | ButtonInteraction
-        | ModalSubmitInteraction,
+        | ModalSubmitInteraction
+        | AnySelectMenuInteraction,
     content: string,
     flags: any,
 ) {
-    if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content, flags });
-    } else {
-        await interaction.reply({ content, flags });
+    try {
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content, flags });
+        } else {
+            await interaction.reply({ content, flags });
+        }
+    } catch (err) {
+        // Discord API is broken ?
+        console.error(
+            `[ERROR] Execute Error Handling: DISCORD IS BROKEN RAHHHHHHHHHHHHHHH`,
+            err,
+        );
     }
 }
 
@@ -210,6 +221,34 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
             await handleDeferredReply(
                 interaction,
                 "An error occured while executing this command.",
+                MessageFlags.Ephemeral,
+            );
+        }
+    }
+
+    // SelectMenu
+    if (interaction.isAnySelectMenu()) {
+        // Make sure that nothing happens in the few milliseconds while reloading, but also saves the user input
+        if (config.locked) {
+            await handleDeferredReply(
+                interaction,
+                "Bot is reloading. Please click again shortly.",
+                MessageFlags.Ephemeral,
+            );
+            return;
+        }
+
+        // Handle
+        const [guildId, commandName, handlerName]: string[] =
+            interaction.customId.split("|");
+        const command = getGuildCommands(guildId).get(commandName);
+        try {
+            command[handlerName](interaction, config);
+        } catch (err) {
+            console.error(`[EXECUTE] An error occured:\n`, err);
+            await handleDeferredReply(
+                interaction,
+                "An error occured while registering this interaction.",
                 MessageFlags.Ephemeral,
             );
         }

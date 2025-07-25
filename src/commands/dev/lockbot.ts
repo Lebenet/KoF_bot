@@ -1,8 +1,19 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import {
+    ChatInputCommandInteraction,
+    SlashCommandBuilder,
+    PermissionFlagsBits,
+    MessageFlags,
+} from "discord.js";
 const { lockBot, unlockBot } = require("../../utils/configLoader");
 
 async function lock(interaction: ChatInputCommandInteraction, config: any) {
-    if (!config.admins || !config.admins.includes(interaction.user.id)) return;
+    if (!config.admins || !config.admins.includes(interaction.user.id)) {
+        await interaction.reply({
+            content: "Seuls les admins du bot peuvent effectuer cette action.",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
 
     const locked: boolean | null = interaction.options.getBoolean("lock");
 
@@ -23,7 +34,8 @@ module.exports = {
                 .setName("lock")
                 .setDescription("True locks, False unlocks")
                 .setRequired(true),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     execute: lock,
 };

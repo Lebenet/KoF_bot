@@ -2,10 +2,11 @@ import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
     MessageFlags,
+    PermissionFlagsBits,
 } from "discord.js";
 import { ChannelParam } from "../../db/dbTypes";
 
-async function setupChannelParams(
+export async function setupChannelParam(
     interaction: ChatInputCommandInteraction,
     config: any,
 ) {
@@ -68,7 +69,8 @@ module.exports = {
                     "Id du salon (Par défault là où tu executes la commande)",
                 )
                 .setRequired(false),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
-    execute: setupChannelParams,
+    execute: setupChannelParam,
 };
