@@ -1,7 +1,7 @@
 import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
-    MessageFlags,
+    PermissionFlagsBits,
 } from "discord.js";
 
 import fs from "fs";
@@ -44,6 +44,34 @@ async function publish(interaction: ChatInputCommandInteraction, config: any) {
 
         // Get the file from the command arg
         const name = interaction.options.getString("name");
+
+        if (name === "all") {
+            fs.readdirSync(path.resolve(`./${dir}/dev`)).forEach((f) => {
+                const file = path.resolve(`./${dir}/dev/${f}`);
+                const dst = path.resolve(`./${dir}/public/${f}`);
+                fs.copyFile(file, dst, async (err) => {
+                    if (err) {
+                        console.error(
+                            `[ERROR] | publish: An error occured while publishing ${name} command|task:\n`,
+                            err,
+                        );
+                        await interaction.editReply(
+                            `Error while publishing **\`/${name}\`** command|task.`,
+                        );
+                    } else {
+                        console.log(
+                            `[COMMANDS] | publish: Succesfully published the ${name} command|task.`,
+                        );
+                        await interaction.editReply(
+                            `Succesfully deployed every ${dir} to live server.`,
+                        );
+                    }
+                });
+            });
+
+            return;
+        }
+
         const file = path.resolve(`./${dir}/dev/${name}.js`);
 
         // Check if the file exists
@@ -101,7 +129,8 @@ module.exports = {
                 .setName("name")
                 .setDescription("Name of what you wish to publish")
                 .setRequired(true),
-        ),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     execute: publish,
 };

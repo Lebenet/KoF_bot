@@ -1,42 +1,16 @@
 import fs from "fs";
 import path from "path";
 import { exit } from "process";
+import Database from "better-sqlite3";
+import { Client } from "discord.js";
 
-/*
-// Files to read
-const dataPaths = {
-    admins: '../data/admins.json',
-    providers: '../data/providers.json',
-    towns: '../data/towns.json'
-}
-*/
-
-// Dynamix config holder
+// Dynamic config holder
 const config: any = {
     locked: false, // Bot lock during hot-reload (or other)
 };
 
 export const lockBot = () => (config.locked = true);
 export const unlockBot = () => (config.locked = false);
-
-/*
-// Not reset during config reload
-const exceptions = Array.of('locked');
-
-function addException(exception) {
-    exceptions.push(exception)
-}
-
-// Reset config keys
-function resetConfig() {
-    for (const key in config) {
-        if (exceptions.includes(key))
-            continue;
-
-        delete config[key];
-    }
-}
-*/
 
 function resolveFromFileName(fileName: string) {
     const filePath = path.resolve(`./data/${fileName}`);
@@ -89,3 +63,7 @@ export function loadConfig(
 }
 
 export const getConfig = () => config;
+
+export const setDb = (db: Database.Database) => (config.db = db);
+
+export const setBot = (bot: Client) => (config.bot = bot);

@@ -89,7 +89,11 @@ export function start() {
     // Load config
     loadConfig(fs.readdirSync("./data/"));
     const config = getConfig();
-    console.log("config:\n", config);
+    console.log("-=========-   CONFIG:");
+    Object.entries(config).forEach(([k, v]) => {
+        if (k !== "bot") console.log(`${k}:`, v);
+    });
+    console.log("-========-");
 
     // Load commands
     initCmdLoad();
