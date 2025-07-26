@@ -28,7 +28,6 @@ import {
     UserSelectMenuBuilder,
     UserSelectMenuInteraction,
     Message,
-    Embed,
 } from "discord.js";
 
 import {
