@@ -15,9 +15,10 @@ async function setupCommands(
     config: any,
 ) {
     if (!config.admins || !config.admins.includes(interaction.user.id)) {
-        await interaction.reply(
+        interaction.reply(
             "Seuls les admins du bot peuvent effectuer cette action.",
         );
+        return;
     }
 
     type TFChannel = TextChannel | ForumChannel;
