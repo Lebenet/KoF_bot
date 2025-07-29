@@ -54,20 +54,21 @@ client.once(Events.ClientReady, (readyClient) => {
     console.log(`Bot ready. Currently logged in as ${readyClient.user.tag}`);
 });
 
-// Log in to bot client
-client.login(token);
-setBot(client); // Commands & tasks
-
 // Ensure temp dir exists
 if (!fs.existsSync(path.resolve("temp/"))) fs.mkdirSync("temp/");
 
-// Start watcher
-console.log(`[STARTUP] Starting watcher...`);
-start();
+// Log in to bot client
+client.login(token).then(() => {
+    setBot(client); // Commands & tasks
 
-// Start task runner
-console.log(`[STARTUP] Starting task runner...`);
-startTaskRunner();
+    // Start watcher
+    console.log(`[STARTUP] Starting watcher...`);
+    start();
+
+    // Start task runner
+    console.log(`[STARTUP] Starting task runner...`);
+    startTaskRunner();
+});
 
 async function handleDeferredReply(
     interaction:
@@ -169,8 +170,10 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         }
 
         // Handle modal submit
-        const [guildId, commandName, handlerName]: string[] =
-            interaction.customId.split("|");
+        const customIdArgs = interaction.customId.split("|");
+        const guildId = interaction.guildId ?? customIdArgs[0];
+        const [commandName, handlerName] = customIdArgs.slice(1, 2);
+
         const command = getGuildCommands(guildId).get(commandName);
 
         // If saved modal resent to the user
@@ -210,8 +213,10 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         }
 
         // Handle other buttons
-        const [guildId, commandName, handlerName]: string[] =
-            interaction.customId.split("|");
+        const customIdArgs = interaction.customId.split("|");
+        const guildId = interaction.guildId ?? customIdArgs[0];
+        const [commandName, handlerName] = customIdArgs.slice(1, 2);
+
         const command = getGuildCommands(guildId).get(commandName);
 
         try {
@@ -239,9 +244,12 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         }
 
         // Handle
-        const [guildId, commandName, handlerName]: string[] =
-            interaction.customId.split("|");
+        const customIdArgs = interaction.customId.split("|");
+        const guildId = interaction.guildId ?? customIdArgs[0];
+        const [commandName, handlerName] = customIdArgs.slice(1, 2);
+
         const command = getGuildCommands(guildId).get(commandName);
+
         try {
             command[handlerName](interaction, config);
         } catch (err) {

@@ -30,9 +30,9 @@ export function unloadCommand(
 
 export function loadCommand(file: string, dir: string) {
     const targetMap: Map<string, any> | undefined =
-        dir == devDir
+        dir === devDir
             ? commands.dev
-            : dir == publicDir
+            : dir === publicDir
               ? commands.public
               : undefined;
     const name = file.replace(".js", ""); // Command name instead of plain filename
@@ -78,6 +78,10 @@ export function initCmdLoad() {
     fs.readdirSync(devDir)
         .filter((file) => file.endsWith(".js"))
         .forEach((file) => loadCommand(file, devDir));
+
+    // Force reload helper after every command is loaded
+    loadCommand("help.js", devDir);
+    loadCommand("help.js", publicDir);
 }
 
 export const getGuildCommands = (guildId: string) => {
