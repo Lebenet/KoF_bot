@@ -17,52 +17,6 @@ import { Config } from "../../db/dbTypes";
 const dirName = (): string => __dirname.replace(/.*\/(dev|public)$/, "$1");
 
 async function help(interaction: ChatInputCommandInteraction, _config: Config) {
-    console.log(
-        getCommandsHelper(
-            (dirName() === "dev"
-                ? process.env.DEV_GUILD_ID
-                : process.env.GUILD_ID) ?? "0",
-        )
-            .toReversed()
-            .map(
-                (n) =>
-                    `- **${n.name}**${(n.args?.length ?? 0 > 0) ? ` *(${n.args!.join(", ")})*` : ""}`,
-            )
-            .join("\n"),
-    );
-    console.log(
-        getCommandsHelper(
-            (dirName() === "dev"
-                ? process.env.DEV_GUILD_ID
-                : process.env.GUILD_ID) ?? "0",
-        )
-            .toReversed()
-            .map(
-                (n) =>
-                    `- **${n.name}**${(n.args?.length ?? 0 > 0) ? ` *(${n.args!.join(", ")})*` : ""}`,
-            )
-            .join("\n").length,
-    );
-
-    console.log(
-        getTasksHelper(
-            (dirName() === "dev"
-                ? process.env.DEV_GUILD_ID
-                : process.env.GUILD_ID) ?? "0",
-        )
-            .map((n) => `- **${n.name}**`)
-            .join("\n"),
-    );
-    console.log(
-        getTasksHelper(
-            (dirName() === "dev"
-                ? process.env.DEV_GUILD_ID
-                : process.env.GUILD_ID) ?? "0",
-        )
-            .map((n) => `- **${n.name}**`)
-            .join("\n").length,
-    );
-
     const commandName = interaction.options.getString("commande");
     if (!commandName) {
         const embed: EmbedBuilder = module.exports.help;
@@ -74,7 +28,6 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
                         ? process.env.DEV_GUILD_ID
                         : process.env.GUILD_ID) ?? "0",
                 )
-                    .toReversed()
                     .map(
                         (n) =>
                             `- **${n.name}**${(n.args?.length ?? 0 > 0) ? ` *(${n.args!.join(", ")})*` : ""}`,
