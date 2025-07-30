@@ -151,62 +151,28 @@ async function initHandler(
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const c_name: string = interaction.fields.getTextInputValue("c_name");
-    const chestRaw = interaction.fields.getTextInputValue("chest");
-    const chest: string | undefined = chestRaw ? chestRaw : undefined;
+    const chest: string = interaction.fields.getTextInputValue("chest");
     const self_supplied: boolean =
         interaction.fields.getTextInputValue("self_supplied") !== "";
-    const descRaw = interaction.fields.getTextInputValue("description");
-    const description: string = descRaw
-        ? descRaw
-        : "Une commande de matériaux.";
+    const description: string =
+        interaction.fields.getTextInputValue("description");
 
-    // Order embed
-    const message = new EmbedBuilder()
-        .setColor(Colors.Orange)
-        .setTitle(c_name)
-        .setAuthor({
-            name: interaction.user.displayName,
-            iconURL: interaction.user.avatarURL()!,
-        })
-        .setDescription(description)
-        .setFooter({
-            text: "WIP. Contact `lebenet` for requests.",
-            iconURL: config.bot.user!.avatarURL()!,
-        })
-        .setTimestamp()
-        .addFields(
-            {
-                name: "**Coffre:**",
-                value: chest ? chest : "- Pas de lieu de dépôt spécifié.",
-            },
-            {
-                name: "**Matériaux fournis:**",
-                value: self_supplied
-                    ? "- Par le créateur de la commande."
-                    : "Non.",
-            },
-            { name: "\u200e", value: "\u200e" },
-            {
-                name: "Informations",
-                value: "Merci de sélectionner les professions correspondant à votre commande, afin de simplifier le travail des coordinateurs.",
-            },
-        );
-
+    // Order thread
     const thread = await channel.threads.create({
         name: c_name,
         autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
         reason: `Create thread for material order.`,
         message: {
-            content: description,
+            content: `\u200e${description}`,
         },
     });
 
     const command: Command = new Command();
-    command.guild_id = interaction.guildId as string;
+    command.guild_id = interaction.guildId!;
     command.thread_id = thread.id;
     command.c_name = c_name;
-    command.chest = chest;
-    command.description = description;
+    if (chest) command.chest = chest;
+    if (description) command.description = description;
     command.self_supplied = self_supplied;
     command.author_id = interaction.user.id;
 
@@ -222,27 +188,21 @@ async function initHandler(
 
         // Confirm order button (send to panel)
         const readyBut = new ButtonBuilder()
-            .setCustomId(
-                `${interaction.guildId}|commander|readyHandler|${command.id}`,
-            )
+            .setCustomId(`|commander|readyHandler|${command.id}`)
             .setLabel("Confirmer")
             .setStyle(ButtonStyle.Success)
             .setDisabled(true);
 
         // Cancel/Complete order button (remove from panel)
         const closeBut = new ButtonBuilder()
-            .setCustomId(
-                `${interaction.guildId}|commander|closeHandler|${command.id}`,
-            )
+            .setCustomId(`|commander|closeHandler|${command.id}`)
             .setLabel("Fermer")
             .setStyle(ButtonStyle.Danger);
 
         // Profession select menu
         const opts = getProfessionsStringSelectMessageComp();
         const profs = new StringSelectMenuBuilder()
-            .setCustomId(
-                `${interaction.guildId}|commander|manageProfessionsHandler|${command.id}`,
-            )
+            .setCustomId(`|commander|manageProfessionsHandler|${command.id}`)
             .setPlaceholder("Métiers")
             .addOptions(opts)
             .setMaxValues(opts.length);
@@ -257,6 +217,40 @@ async function initHandler(
             new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
                 profs,
             );
+
+        // Order embed
+        const message = new EmbedBuilder()
+            .setColor(Colors.Orange)
+            .setTitle(command.c_name)
+            .setAuthor({
+                name: interaction.user.displayName,
+                iconURL: interaction.user.avatarURL()!,
+            })
+            .setDescription(command.description)
+            .setFooter({
+                text: "WIP. Contact `lebenet` for requests.",
+                iconURL: config.bot.user!.avatarURL()!,
+            })
+            .setTimestamp()
+            .addFields(
+                {
+                    name: "**Coffre:**",
+                    value: command.chest,
+                },
+                {
+                    name: "**Matériaux fournis:**",
+                    value: command.self_supplied
+                        ? "- Par le créateur de la commande."
+                        : "Non.",
+                },
+                // Empty line
+                { name: "\u200e", value: "\u200e" },
+                {
+                    name: "Informations",
+                    value: "Merci de sélectionner les professions correspondant à votre commande, afin de simplifier le travail des coordinateurs.",
+                },
+            );
+
         const msg = await thread.send({
             embeds: [message],
             components: [row1, row2],
@@ -274,7 +268,10 @@ async function initHandler(
             return;
         }
 
-        await interaction.deleteReply();
+        await interaction.editReply(
+            `Votre commande peut être __complétée__ dans **<#${thread.id}>** !`,
+        );
+        setTimeout(() => interaction.deleteReply(), 15000);
     }
 }
 

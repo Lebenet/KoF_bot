@@ -1,5 +1,13 @@
 FROM node:22-alpine
 
+# Install tzdata
+RUN apk add --no-cache tzdata
+
+# Set the timezone to Europe/Paris
+ENV TZ=Europe/Paris
+RUN cp /usr/share/zoneinfo/Europe/Paris /etc/localtime \
+  && echo "Europe/Paris" > /etc/timezone
+
 # Create the bot directory
 RUN mkdir -p /usr/bot/dist
 WORKDIR /usr/bot

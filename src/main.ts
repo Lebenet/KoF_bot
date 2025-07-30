@@ -172,7 +172,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         // Handle modal submit
         const customIdArgs = interaction.customId.split("|");
         const guildId = interaction.guildId ?? customIdArgs[0];
-        const [commandName, handlerName] = customIdArgs.slice(1, 2);
+        const [commandName, handlerName] = customIdArgs.slice(1, 3);
 
         const command = getGuildCommands(guildId).get(commandName);
 
@@ -215,7 +215,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         // Handle other buttons
         const customIdArgs = interaction.customId.split("|");
         const guildId = interaction.guildId ?? customIdArgs[0];
-        const [commandName, handlerName] = customIdArgs.slice(1, 2);
+        const [commandName, handlerName] = customIdArgs.slice(1, 3);
 
         const command = getGuildCommands(guildId).get(commandName);
 
@@ -246,7 +246,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         // Handle
         const customIdArgs = interaction.customId.split("|");
         const guildId = interaction.guildId ?? customIdArgs[0];
-        const [commandName, handlerName] = customIdArgs.slice(1, 2);
+        const [commandName, handlerName] = customIdArgs.slice(1, 3);
 
         const command = getGuildCommands(guildId).get(commandName);
 

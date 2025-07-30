@@ -28,10 +28,13 @@ process.on("SIGINT", () => {
 // export const ready = () => db.open;
 
 const tables = [
-	// Temporary
+    // Temporary
 
-	// End temporary
-	
+    `DROP TABLE Skills`,
+    `DROP TABLE Users`,
+
+    // End temporary
+
     `CREATE TABLE IF NOT EXISTS ChannelParams(
 		channel_id TEXT NOT NULL,
 		guild_id TEXT NOT NULL,
@@ -39,34 +42,35 @@ const tables = [
 		command_param VARCHAR(255) NOT NULL,
 		PRIMARY KEY(guild_id, command_name, command_param)
 	);`,
-
     `CREATE TABLE IF NOT EXISTS Users(
 		id TEXT PRIMARY KEY NOT NULL,
 		player_id TEXT,
 		username VARCHAR(255) NOT NULL DEFAULT "empty_username",
 		player_username VARCHAR(255) NOT NULL DEFAULT "empty_game_username",
-		bot_perm INTEGER NOT NULL DEFAULT 0
+		bot_perm INTEGER NOT NULL DEFAULT 0,
+		last_updated_skills DATETIME
 	);`,
 
-	`CREATE TABLE IF NOT EXISTS Professions(
+    `CREATE TABLE IF NOT EXISTS Professions(
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
 		description TEXT NOT NULL
 	);`,
-	`CREATE TABLE IF NOT EXISTS Fournisseurs(
+    `CREATE TABLE IF NOT EXISTS Fournisseurs(
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 		guild_id TEXT NOT NULL,
 		coordinator BOOLEAN NOT NULL DEFAULT FALSE CHECK (coordinator IN (0, 1)),
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name) ON DELETE CASCADE,
 		PRIMARY KEY (user_id, guild_id, profession_name)
 	);`,
-	`CREATE TABLE IF NOT EXISTS Skills(
-		user_id TEXT PRIMARY KEY REFERENCES Users(id),
+    `CREATE TABLE IF NOT EXISTS Skills(
+		user_id TEXT REFERENCES Users(id) ON DELETE CASCADE,
 		xp INTEGER NOT NULL DEFAULT 0,
 		level INTEGER NOT NULL DEFAULT 0,
-		profession_name VARCHAR(255) REFERENCES Professions(p_name)
+		profession_name VARCHAR(255) REFERENCES Professions(p_name) ON DELETE CASCADE,
+		PRIMARY KEY (user_id, profession_name)
 	);`,
 
-	`CREATE TABLE IF NOT EXISTS Commands(
+    `CREATE TABLE IF NOT EXISTS Commands(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		guild_id TEXT NOT NULL,
 		thread_id TEXT NOT NULL,
@@ -80,18 +84,18 @@ const tables = [
 		author_id TEXT NOT NULL REFERENCES Users(id),
 		status VARCHAR(255) NOT NULL DEFAULT "Building"
 	);`,
-	`CREATE TABLE IF NOT EXISTS CommandAssignees(
+    `CREATE TABLE IF NOT EXISTS CommandAssignees(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 		PRIMARY KEY(command_id, user_id)
 	);`,
-	`CREATE TABLE IF NOT EXISTS CommandProfessions(
+    `CREATE TABLE IF NOT EXISTS CommandProfessions(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name) ON DELETE CASCADE,
 		filled BOOLEAN NOT NULL DEFAULT FALSE CHECK (filled IN (0, 1)),
 		PRIMARY KEY (command_id, profession_name)
 	);`,
-	`CREATE TABLE IF NOT EXISTS CommandItems (
+    `CREATE TABLE IF NOT EXISTS CommandItems (
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		item_name TEXT NOT NULL,
 		quantity INTEGER NOT NULL DEFAULT 1,
@@ -105,12 +109,12 @@ function init() {
     if (_init) return;
     // Make sure every table exists correctly
     for (const table of tables) {
-		try {
-        	db.exec(table);
-		} catch (err) {
-			console.log(table);
-			throw err;
-		}
+        try {
+            db.exec(table);
+        } catch (err) {
+            console.log(table);
+            throw err;
+        }
     }
     _init = true;
 }
