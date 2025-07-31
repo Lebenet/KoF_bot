@@ -81,7 +81,7 @@ class Model {
     }
 
     private assign(row: any) {
-        console.log(row);
+        // console.log(row);
         for (const key in row) {
             const v = row[key];
             if (!this.fieldTypes || !this.fieldTypes[key]) {
@@ -170,6 +170,24 @@ class Model {
         });
         if (options && options.array) return instances;
         return instances.length === 1 ? instances[0] : instances;
+    }
+
+    public static fetchArray<T extends typeof Model>(
+        this: T,
+        options?: DbOptions | null,
+    ): InstanceType<T>[] {
+        const opts: DbOptions = options ?? {};
+        opts.array = true;
+        return this.fetch(opts) as InstanceType<T>[];
+    }
+
+    public static get<T extends typeof Model>(
+        this: T,
+        options?: DbOptions | null,
+    ): InstanceType<T> | null {
+        const opts: DbOptions = options ?? {};
+        opts.limit = 1;
+        return this.fetch(opts) as InstanceType<T> | null;
     }
 
     // Get new data from database relative to this specific instance
@@ -389,6 +407,7 @@ export class ChannelParam extends Model {
 export class Profession extends Model {
     public p_name!: string;
     public description!: string;
+    public emoji!: string;
 
     public toString(): string {
         return this.p_name;
@@ -408,8 +427,8 @@ export class Fournisseur extends Model {
 
 export class Skill extends Model {
     public user_id!: string;
-    public xp!: number | bigint | string;
-    public level!: number | bigint | string;
+    public xp!: number | string;
+    public level!: number | string;
     public profession_name!: string;
 }
 
@@ -458,71 +477,31 @@ export type Config = {
 };
 
 // Add professions
-for (const [n, d] of [
-    ["Forestry", "Bûcheron"],
-    ["Carpentry", "Charpentier"],
-    ["Masonry", "Maçon"],
-    ["Mining", "Mineur"],
-    ["Smithing", "Forgeron"],
-    ["Scholar", "Savant"],
-    ["Leatherworking", "Tanneur"],
-    ["Hunting", "Chasseur"],
-    ["Tailoring", "Tisserand"],
-    ["Farming", "Fermier"],
-    ["Fishing", "Pêcheur"],
-    ["Cooking", "Cuistot"],
-    ["Foraging", "Ramasseur"],
-    ["Construction", "Construction"],
-    ["Taming", "Eleveur"],
-    ["Slayer", "Massacreur"],
-    ["Merchanting", "Marchand"],
-    ["Sailing", "Navigateur"],
+for (const [n, d, e] of [
+    ["Forestry", "Bûcheron", "🪓"],
+    ["Carpentry", "Charpentier", "🪚"],
+    ["Masonry", "Maçon", "⚒️"],
+    ["Mining", "Mineur", "⛏️"],
+    ["Smithing", "Forgeron", "🔨"],
+    ["Scholar", "Savant", "🪶"],
+    ["Leatherworking", "Tanneur", "⁉️"],
+    ["Hunting", "Chasseur", "🏹"],
+    ["Tailoring", "Tisserand", "🧶"],
+    ["Farming", "Fermier", "🌿"],
+    ["Fishing", "Pêcheur", "🎣"],
+    ["Cooking", "Cuistot", "🍴"],
+    ["Foraging", "Ceuilleur", "🫴"],
+    ["Construction", "Construction", "🛠️"],
+    ["Taming", "Eleveur", "🐑"],
+    ["Slayer", "Massacreur", "☠️"],
+    ["Merchanting", "Marchand", "💰"],
+    ["Sailing", "Navigateur", "⛵"],
 ]) {
     db.prepare(
         `
-		INSERT INTO Professions(p_name, description)
-		VALUES (?, ?)
+		INSERT INTO Professions(p_name, description, emoji)
+		VALUES (?, ?, ?)
 		ON CONFLICT(p_name) DO NOTHING;
 	`,
-    ).run(n, d);
-    /*
-	const p = new Profession();
-	p.p_name = n;
-	p.description = d;
-	p.insert();
-	*/
+    ).run(n, d, e);
 }
-
-console.log(User.fetch());
-
-/*
-
-const chanParam = new ChannelParam();
-chanParam.channel_id = "1396511696859693087";
-chanParam.guild_id = "877114572337725441";
-chanParam.command_name = "test_chan_param";
-chanParam.command_param = "param1";
-chanParam.insert();
-
-const chanParam1 = new ChannelParam();
-chanParam1.channel_id = "22222222";
-chanParam1.guild_id = "877114572337725441";
-chanParam1.command_name = "test_chan_param";
-chanParam1.command_param = "param2";
-chanParam1.insert();
-
-const chanParam2 = new ChannelParam();
-chanParam2.channel_id = "1396511696859693087";
-chanParam2.guild_id = "877114572337725441";
-chanParam2.command_name = "test_chan_param_numero2";
-chanParam2.command_param = "param1";
-chanParam2.insert();
-
-const chanParam3 = new ChannelParam();
-chanParam3.channel_id = "1234";
-chanParam3.guild_id = "12345";
-chanParam3.command_name = "etst2";
-chanParam3.command_param = "test";
-chanParam3.insert();
-
-*/

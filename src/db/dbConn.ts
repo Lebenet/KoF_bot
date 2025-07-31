@@ -30,8 +30,9 @@ process.on("SIGINT", () => {
 const tables = [
     // Temporary
 
-    `DROP TABLE Skills`,
-    `DROP TABLE Users`,
+    // `DROP TABLE Skills`,
+    // `DROP TABLE Users`,
+    // `DROP TABLE IF EXISTS Professions`,
 
     // End temporary
 
@@ -51,9 +52,11 @@ const tables = [
 		last_updated_skills DATETIME
 	);`,
 
+    // DO NOT DELETE, ONLY ALTER
     `CREATE TABLE IF NOT EXISTS Professions(
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
-		description TEXT NOT NULL
+		description TEXT NOT NULL,
+		emoji TEXT NOT NULL DEFAULT "⁉️"
 	);`,
     `CREATE TABLE IF NOT EXISTS Fournisseurs(
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,

@@ -7,10 +7,11 @@ import {
     EmbedFooterOptions,
     SlashCommandBuilder,
 } from "discord.js";
-import { Profession } from "../db/dbTypes";
+import { Profession, Skill, User } from "../db/dbTypes";
 import { getGuildCommands } from "./commandLoader";
 import { getGuildTasks } from "./taskLoader";
 import { getConfig } from "./configLoader";
+import { getParisDatetimeSQLiteSafe } from "./taskUtils";
 
 export function getProfessionsStringSelectCommandArg(): {
     name: string;
@@ -226,7 +227,8 @@ function globalEmbedFactory(embedType: EmbedType, color: number): EmbedBuilder {
     }
 
     if (embedType.timestamp) {
-        embed.setTimestamp();
+        if (typeof embedType.timestamp === "boolean") embed.setTimestamp();
+        else embed.setTimestamp(embedType.timestamp);
     }
 
     if (embedType.thumbnail) {
@@ -238,6 +240,10 @@ function globalEmbedFactory(embedType: EmbedType, color: number): EmbedBuilder {
     }
 
     return embed;
+}
+
+export function blandEmbed(embedType: EmbedType) {
+    return globalEmbedFactory(embedType, Colors.DarkGrey);
 }
 
 export function primaryEmbed(embedType: EmbedType) {
@@ -266,9 +272,148 @@ export type EmbedType = {
     fields?: APIEmbedField[];
     footer?: EmbedFooterOptions;
     author?: EmbedAuthorOptions;
-    timestamp?: boolean;
+    timestamp?: boolean | Date;
     thumbnail?: string;
     image?: string;
 };
 
 // End Custom Embed Builder
+
+export async function updateSkills(
+    userId: string,
+): Promise<
+    { success: false; error?: string } | { success: true; message?: string }
+> {
+    const user = new User();
+    user.id = userId;
+    if (!user.sync()) {
+        console.error(`[ERROR] updateSkills: DB error on user sync.`);
+        return { success: false, error: "Erreur de DB ! Veuillez réessayer." };
+    }
+
+    const currTime = new Date(getParisDatetimeSQLiteSafe());
+    // If user has already fetched skills recently
+    if (
+        user.last_updated_skills &&
+        user.last_updated_skills.getTime() + 5 * 60_000 >= currTime.getTime()
+    )
+        return {
+            success: false,
+            error: "Vos skills ont déjà été update récemment.",
+        };
+
+    user.last_updated_skills = currTime;
+    if (!user.update()) {
+        console.error(`[ERROR] updateSkills: DB error on user update.`);
+        return {
+            success: false,
+            error: "Erreur de DB en updatant vos informations ! Veuillez réessayer.",
+        };
+    }
+
+    const playerId = user.player_id;
+    if (!user.player_id)
+        return {
+            success: false,
+            error: "Cet utilisateur n'est pas link. Merci de faire `/link`.",
+        };
+    // const playerName = user.player_username!;
+
+    // custom types for typescript (and easier debug)
+    type skillMapEntry = {
+        id: number;
+        name: string;
+        title: string;
+        skillCategoryStr: string;
+    };
+    type skillMap = { [key: string]: skillMapEntry };
+
+    type experienceListEntry = {
+        quantity: number;
+        skill_id: number;
+    };
+    type experienceList = experienceListEntry[];
+
+    type Data = {
+        experience: experienceList;
+        skillMap: skillMap;
+    };
+
+    // Fetch data
+    const res = await fetch(`https://bitjita.com/api/players/${playerId}`, {
+        method: "GET",
+    });
+
+    // Try to parse it
+    try {
+        const json = await res.json();
+        if (json.error)
+            return { success: false, error: "L'ID rentré n'est pas bon !" };
+
+        const data: Data = json.player;
+
+        const skills: Map<string, string> = new Map();
+        const known_professions: string[] = Profession.fetchArray().map(
+            (p) => p.p_name,
+        );
+        Object.entries(data.skillMap as skillMap)
+            .filter(([_, v]) => v.title !== "")
+            .forEach(([k, v]) => skills.set(k, v.name));
+
+        const experience = data.experience
+            .toSorted((e1, e2) => e1.skill_id - e2.skill_id)
+            .map((e) => {
+                return {
+                    profession_name: skills.get(`${e.skill_id}`)!,
+                    xp: e.quantity,
+                    level: xpToLevel(e.quantity),
+                };
+            }) // TOKNOW: Level calc is approximative
+            .filter((sk) => known_professions.includes(sk.profession_name));
+
+        experience.forEach((e) => {
+            const sk = new Skill();
+            // PKs
+            sk.user_id = user.id;
+            sk.profession_name = e.profession_name;
+            // values to update
+            sk.level = e.level;
+            sk.xp = e.xp;
+
+            if (!sk.update()) {
+                console.warn(
+                    `[WARN] update skills: couldn't update skill ${sk.profession_name} for ${user.player_username}.\nAttempting insert...`,
+                );
+                if (!sk.insert())
+                    console.warn(
+                        `[WARN] update skills: couldn't insert either.`,
+                    );
+                // else console.log(sk);
+            }
+            // else console.log(sk);
+        });
+    } catch (err) {
+        console.error(`[ERROR] updateSkills: error on reading data.`, err);
+        return {
+            success: false,
+            error: "Erreur en lisant les données du site.\nSi le site fonctionne, merci de contacter `lebenet`.",
+        };
+    }
+
+    return {
+        success: true,
+        message:
+            "Update réussie ! La page des skills devrait maintenant être à jour.",
+    };
+}
+
+const _emojisSkillsMap = new Map<string, string>();
+
+export function getEmoji(skill: string) {
+    if (_emojisSkillsMap.entries.length === 0)
+        Profession.fetchArray().forEach((p) =>
+            _emojisSkillsMap.set(p.p_name, p.emoji),
+        );
+
+    return _emojisSkillsMap.get(skill);
+}
