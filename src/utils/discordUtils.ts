@@ -56,7 +56,10 @@ export function getCommandsHelper(
                 args: [
                     ...(commands.get(k).data as SlashCommandBuilder)
                         .toJSON()
-                        .options!.map((option) => option.name),
+                        .options!.map(
+                            (option) =>
+                                `${option.required ? "**\\***" : ""}${option.name}`,
+                        ),
                 ],
             };
         }),
