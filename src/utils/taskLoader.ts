@@ -50,7 +50,9 @@ export function activateTask(task: any) {
     task.data.activated = true;
     if (task.data.repeat > 0) task.data.repeats = task.data.repeat;
     try {
-        task.data.nextTimestamp = computeNextTimestamp(task.data);
+        task.data.nextTimestamp = task.data.runOnStart
+            ? Date.now()
+            : computeNextTimestamp(task.data);
     } catch (e) {
         console.error(`[ERROR] Task Activate:`, e);
         return false;
