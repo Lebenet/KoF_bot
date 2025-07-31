@@ -43,10 +43,11 @@ module.exports = {
         interaction.editReply("Success");
     },
 
-    help: warningEmbed({
-        title: "delete_command | Aide",
-        description:
-            "Une commande (du bot) pour supprimer une commande (de matériaux).\n\
+    help: () =>
+        warningEmbed({
+            title: "delete_command | Aide",
+            description:
+                "Une commande (du bot) pour supprimer une commande (de matériaux).\n\
 		S'utilise avec l'ID de la commande (de matériaux).",
-    }),
+        }),
 };

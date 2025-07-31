@@ -61,8 +61,6 @@ function taskWatcherHandler(filePath: string, event: string) {
             console.log(`[WARN] Task Watcher: Unhandled event ${event}.`);
     }
 
-    loadCommand("help.js", folders.commands[dir.replace("tasks", "commands")]);
-
     console.log(getTasks());
 
     console.log(
@@ -167,7 +165,6 @@ export function start() {
 
             const guild_id = getGuildId(dir);
             loadCommand(file, folders.commands[dir]);
-            loadCommand("help.js", folders.commands[dir]);
             sendCommands(guild_id);
             console.log(getCommands());
 
@@ -190,7 +187,6 @@ export function start() {
 
             const guild_id = getGuildId(dir);
             loadCommand(file, folders.commands[dir]);
-            loadCommand("help.js", folders.commands[dir]);
             sendCommands(guild_id);
             console.log(getCommands());
 
@@ -213,7 +209,6 @@ export function start() {
 
             const guild_id = getGuildId(dir);
             unloadCommand(file, filePath, getGuildCommands(guild_id));
-            loadCommand("help.js", folders.commands[dir]);
             sendCommands(guild_id);
             console.log(getCommands());
 

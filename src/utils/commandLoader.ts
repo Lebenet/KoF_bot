@@ -78,10 +78,6 @@ export function initCmdLoad() {
     fs.readdirSync(devDir)
         .filter((file) => file.endsWith(".js"))
         .forEach((file) => loadCommand(file, devDir));
-
-    // Force reload helper after every command is loaded
-    loadCommand("help.js", devDir);
-    loadCommand("help.js", publicDir);
 }
 
 export const getGuildCommands = (guildId: string) => {

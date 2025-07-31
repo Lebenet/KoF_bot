@@ -56,8 +56,12 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     }
 
     const command = getGuildCommands(interaction.guildId!).get(commandName);
-    if (command.help) interaction.reply({ embeds: [command.help] });
-    else interaction.reply("Cette commande n'a pas de message d'aide défini !");
+    if (command.help) interaction.reply({ embeds: [command.help()] });
+    else
+        interaction.reply({
+            content: "Cette commande n'a pas de message d'aide défini !",
+            flags: MessageFlags.Ephemeral,
+        });
 }
 
 module.exports = {
@@ -79,20 +83,21 @@ module.exports = {
         ),
 
     execute: help,
-    help: personalEmbed(
-        {
-            title: "Liste des commandes et tâches du serveur:",
-            description:
-                "*Si vous souhaitez afficher l'aide d'un commande en particulier, faites `/help <commande>`.\n \
+    help: () =>
+        personalEmbed(
+            {
+                title: "Liste des commandes et tâches du serveur:",
+                description:
+                    "*Si vous souhaitez afficher l'aide d'un commande en particulier, faites `/help <commande>`.\n \
 			L'aide pour les tâches automatiques n'est pas encore supporté.*",
-            fields: [
-                {
-                    name: "Error",
-                    value: "Something went wrong, please ask an admin to reload this command.",
-                },
-            ],
-            thumbnail: getConfig().bot.user.avatarURL(),
-        },
-        Colors.Yellow,
-    ),
+                fields: [
+                    {
+                        name: "Error",
+                        value: "Something went wrong, please ask an admin to reload this command.",
+                    },
+                ],
+                thumbnail: getConfig().bot.user.avatarURL(),
+            },
+            Colors.Yellow,
+        ),
 };
