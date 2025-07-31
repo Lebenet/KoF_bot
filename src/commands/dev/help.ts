@@ -19,7 +19,7 @@ const dirName = (): string => __dirname.replace(/.*\/(dev|public)$/, "$1");
 async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     const commandName = interaction.options.getString("commande");
     if (!commandName) {
-        const embed: EmbedBuilder = module.exports.help;
+        const embed: EmbedBuilder = module.exports.help();
         embed.setFields([
             {
                 name: "__Commandes__:",
