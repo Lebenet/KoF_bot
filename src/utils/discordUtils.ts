@@ -7,7 +7,7 @@ import {
     EmbedFooterOptions,
     SlashCommandBuilder,
 } from "discord.js";
-import { Profession, Skill, User } from "../db/dbTypes";
+import { Profession, Skill, SkillKind, User } from "../db/dbTypes";
 import { getGuildCommands } from "./commandLoader";
 import { getGuildTasks } from "./taskLoader";
 import { getConfig } from "./configLoader";
@@ -411,12 +411,22 @@ export async function updateSkills(
 }
 
 const _emojisSkillsMap = new Map<string, string>();
+const _kindSkillsMap = new Map<string, SkillKind>();
 
 export function getEmoji(skill: string) {
-    if (_emojisSkillsMap.entries.length === 0)
+    if (_emojisSkillsMap.size === 0)
         Profession.fetchArray().forEach((p) =>
             _emojisSkillsMap.set(p.p_name, p.emoji),
         );
 
     return _emojisSkillsMap.get(skill);
+}
+
+export function getKind(skill: string): SkillKind {
+    if (_kindSkillsMap.size === 0)
+        Profession.fetchArray().forEach((p) =>
+            _kindSkillsMap.set(p.p_name, p.kind as SkillKind),
+        );
+
+    return _kindSkillsMap.get(skill)!;
 }

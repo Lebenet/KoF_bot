@@ -1,9 +1,10 @@
 // UNFINISHED: simple ORM attempt
 
-import { Client } from "discord.js";
+import { APIEmbedField, Client } from "discord.js";
 import { db } from "./dbConn";
 import Database from "better-sqlite3";
 import { getParisDatetimeSQLiteSafe } from "../utils/taskUtils";
+import { getEmoji } from "../utils/discordUtils";
 
 export type DbOptions = {
     keys?: string[] | string | null;
@@ -406,6 +407,7 @@ export class ChannelParam extends Model {
 
 export class Profession extends Model {
     public p_name!: string;
+    public kind!: string;
     public description!: string;
     public emoji!: string;
 
@@ -430,6 +432,21 @@ export class Skill extends Model {
     public xp!: number | string;
     public level!: number | string;
     public profession_name!: string;
+
+    public format(): APIEmbedField {
+        return {
+            name:
+                `${getEmoji(this.profession_name)} ${this.profession_name}` +
+                (() => {
+                    let str = "";
+                    let i = 9 - this.profession_name.length;
+                    while (i-- > 0) str += "ㅤ";
+                    return str;
+                })(),
+            value: `Level **${this.level}**\n-# *(${this.xp} XP)*`,
+            inline: true,
+        };
+    }
 }
 
 export class Command extends Model {
@@ -476,32 +493,114 @@ export type Config = {
     [key: string]: any;
 };
 
+export enum SkillKind {
+    Profession = "profession",
+    Gather = "profession",
+    Refine = "profession",
+    Skill = "skill",
+}
+
+//console.log(SkillKind);
+//console.log(SkillKind.Profession);
+
 // Add professions
-for (const [n, d, e] of [
-    ["Forestry", "Bûcheron", "🪓"],
-    ["Carpentry", "Charpentier", "🪚"],
-    ["Masonry", "Maçon", "⚒️"],
-    ["Mining", "Mineur", "⛏️"],
-    ["Smithing", "Forgeron", "🔨"],
-    ["Scholar", "Savant", "🪶"],
-    ["Leatherworking", "Tanneur", "⁉️"],
-    ["Hunting", "Chasseur", "🏹"],
-    ["Tailoring", "Tisserand", "🧶"],
-    ["Farming", "Fermier", "🌿"],
-    ["Fishing", "Pêcheur", "🎣"],
-    ["Cooking", "Cuistot", "🍴"],
-    ["Foraging", "Ceuilleur", "🫴"],
-    ["Construction", "Construction", "🛠️"],
-    ["Taming", "Eleveur", "🐑"],
-    ["Slayer", "Massacreur", "☠️"],
-    ["Merchanting", "Marchand", "💰"],
-    ["Sailing", "Navigateur", "⛵"],
+for (const [n, k, d, e] of [
+    [
+        "Forestry",
+        SkillKind.Gather,
+        "Bûcheron",
+        "<:skill_forestry:1400969700925771787>",
+    ],
+    [
+        "Carpentry",
+        SkillKind.Refine,
+        "Charpentier",
+        "<:skill_carpentry:1400969531857309726>",
+    ],
+    [
+        "Masonry",
+        SkillKind.Refine,
+        "Maçon",
+        "<:skill_masonry:1400969755904442569>",
+    ],
+    [
+        "Mining",
+        SkillKind.Gather,
+        "Mineur",
+        "<:skill_mining:1400969776494542888>",
+    ],
+    [
+        "Smithing",
+        SkillKind.Refine,
+        "Forgeron",
+        "<:skill_smithing:1400969823516753920>",
+    ],
+    [
+        "Scholar",
+        SkillKind.Refine,
+        "Savant",
+        "<:skill_scholar:1400969804977799168>",
+    ],
+    [
+        "Leatherworking",
+        SkillKind.Refine,
+        "Tanneur",
+        "<:skill_leatherworking:1400969735029526608>",
+    ],
+    [
+        "Hunting",
+        SkillKind.Gather,
+        "Chasseur",
+        "<:skill_hunting:1400969717371375796>",
+    ],
+    [
+        "Tailoring",
+        SkillKind.Refine,
+        "Tisserand",
+        "<:skill_tailoring:1400969842479071354>",
+    ],
+    [
+        "Farming",
+        SkillKind.Refine,
+        "Fermier",
+        "<:skill_farming:1400969632772259890>",
+    ],
+    [
+        "Fishing",
+        SkillKind.Gather,
+        "Pêcheur",
+        "<:skill_fishing:1400969663763972157>",
+    ],
+    [
+        "Cooking",
+        SkillKind.Skill,
+        "Cuistot",
+        "<:skill_cooking:1400969611943350272>",
+    ],
+    [
+        "Foraging",
+        SkillKind.Gather,
+        "Ceuilleur",
+        "<:skill_foraging:1400969681640226967>",
+    ],
+    ["Construction", SkillKind.Skill, "Construction", "🛠️"],
+    ["Taming", SkillKind.Skill, "Eleveur", "🐑"],
+    ["Slayer", SkillKind.Skill, "Massacreur", "☠️"],
+    ["Merchanting", SkillKind.Skill, "Marchand", "💰"],
+    ["Sailing", SkillKind.Skill, "Navigateur", "⛵"],
 ]) {
     db.prepare(
         `
-		INSERT INTO Professions(p_name, description, emoji)
-		VALUES (?, ?, ?)
+		INSERT INTO Professions(p_name, kind, description, emoji)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(p_name) DO NOTHING;
 	`,
-    ).run(n, d, e);
+    ).run(n, k, d, e);
+    db.prepare(
+        `UPDATE Professions 
+        SET kind = ?, description = ?, emoji = ?
+        WHERE p_name = ?;`,
+    ).run(k, d, e, n);
 }
+
+//console.log(Profession.fetchArray());

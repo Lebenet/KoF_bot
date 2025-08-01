@@ -55,6 +55,7 @@ const tables = [
     // DO NOT DELETE, ONLY ALTER
     `CREATE TABLE IF NOT EXISTS Professions(
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
+		kind TEXT NOT NULL DEFAULT 'unknown',
 		description TEXT NOT NULL,
 		emoji TEXT NOT NULL DEFAULT "⁉️"
 	);`,

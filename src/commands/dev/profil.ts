@@ -15,8 +15,16 @@ import {
     warningEmbed,
     updateSkills,
     getEmoji,
+    getKind,
 } from "../../utils/discordUtils";
-import { Config, User, Fournisseur, Skill } from "../../db/dbTypes";
+import {
+    Config,
+    User,
+    Fournisseur,
+    Skill,
+    Profession,
+    SkillKind,
+} from "../../db/dbTypes";
 
 async function getProfileEmbed(
     userId: string,
@@ -72,21 +80,29 @@ async function getSkillsEmbed(userId: string, config: Config) {
 
     const dUser = await config.bot.users.fetch(userId)!;
 
+    const skills = Skill.fetchArray({
+        keys: "user_id",
+        values: userId,
+    }).toSorted((s1, s2) => (s1.profession_name < s2.profession_name ? -1 : 1));
+    const pskills = skills.filter((s) =>
+        [SkillKind.Profession, SkillKind.Gather, SkillKind.Refine].includes(
+            getKind(s.profession_name),
+        ),
+    );
+    const sskills = skills.filter(
+        (s) => getKind(s.profession_name) === SkillKind.Skill,
+    );
+
     return primaryEmbed({
         author: { name: dUser.displayName, iconURL: dUser.displayAvatarURL() },
         title: `Tableau des __métiers__`,
         description: `*Utilisateur Discord: <@${user.id}>*`,
-        fields: Skill.fetchArray({ keys: "user_id", values: userId })
-            .toSorted((s1, s2) =>
-                s1.profession_name < s2.profession_name ? -1 : 1,
-            )
-            .map((s) => {
-                return {
-                    name: `${getEmoji(s.profession_name)} - ${s.profession_name}`,
-                    value: `Level **${s.level}**\n-# *(${s.xp} XP)*`,
-                    inline: true,
-                };
-            }),
+        fields: [
+            { name: "\u200e", value: "**__Professions__**", inline: false },
+            ...pskills.map((s) => s.format()),
+            { name: "\u200e", value: "**__Skills__**", inline: false },
+            ...sskills.map((s) => s.format()),
+        ],
         footer: { text: "Dernière update:" },
         timestamp: user.last_updated_skills,
     });
