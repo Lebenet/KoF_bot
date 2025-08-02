@@ -506,7 +506,9 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
                 value: command.self_supplied ? "Oui." : "Non.",
                 inline: true,
             },
-            msg.embeds[0].fields.find((f) => f.name === "Professions") ?? {
+            msg.embeds[0].fields.find((f) =>
+                f.name.toLowerCase().includes("professions"),
+            ) ?? {
                 name: "Professions",
                 value: "Pas précisé.",
                 inline: false,
