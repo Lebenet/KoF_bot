@@ -5,6 +5,8 @@
         "lib": ["ESNext", "dom"],
         "rootDir": "src",
         "outDir": "dist",
+        "incremental": true,
+        "tsBuildInfoFile": "./.tsbuildinfo",
         "strict": true,
         "importHelpers": true,
         "esModuleInterop": true,

@@ -22,11 +22,7 @@ async function publish(interaction: ChatInputCommandInteraction, config: any) {
         await interaction.deferReply();
 
         // Check user has sufficient permissions
-        if (
-            !config.admins ||
-            !interaction.member ||
-            !config.admins.includes(interaction.member.user.id)
-        ) {
+        if (!config.admins || !config.admins.includes(interaction.user.id)) {
             await interaction.editReply(
                 `Only bot admins can use this command.`,
             );

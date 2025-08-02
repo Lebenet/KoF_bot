@@ -21,8 +21,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
             return;
         }
 
-        // FIXME
-        // TODO: retrieve playerId from BitJita using name
+        // FIXME: retrieve playerId from BitJita using name
         interaction.editReply(
             "WIP. Pas implémenté. Merci d'utiliser player_id.",
         );

@@ -1,6 +1,8 @@
 import chokidar from "chokidar";
 import fs from "fs";
-import path, { format } from "path";
+import path from "path";
+
+let cmdUpdateTimeout: NodeJS.Timeout | null = null;
 
 import {
     initCmdLoad,
@@ -66,6 +68,48 @@ function taskWatcherHandler(filePath: string, event: string) {
     console.log(
         `[WATCHER](Task) ${event}${event === "change" ? "" : "e"}d: ${filePath}`,
     );
+}
+
+function commandWatcherHandler(filePath: string, event: string) {
+    // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
+    lockBot();
+
+    const { file, dir } = getFileDir(filePath);
+    if (!file || !dir) {
+        console.error(
+            `[ERROR] | WatcherCmd ${event}: failed to extract filename and dir from filePath: ${filePath}`,
+        );
+        return;
+    }
+
+    const guild_id = getGuildId(dir);
+
+    switch (event) {
+        case "add":
+        case "change":
+            loadCommand(file, folders.commands[dir]);
+            break;
+        case "unlink":
+            unloadCommand(file, filePath, getGuildCommands(guild_id));
+            break;
+        default:
+            console.log(`[WARN] Command Watcher: Unhandled event ${event}.`);
+    }
+
+    if (cmdUpdateTimeout) clearTimeout(cmdUpdateTimeout);
+
+    cmdUpdateTimeout = setTimeout(() => {
+        sendCommands(guild_id);
+        console.log(getCommands());
+        cmdUpdateTimeout = null;
+    }, 1_000);
+
+    console.log(
+        `[WATCHER] ${event}${event === "change" ? "" : "e"}d: ${filePath}`,
+    );
+
+    // Unlock bot once hot-reload is complete
+    unlockBot();
 }
 
 function getFileDir(filePath: string) {
@@ -151,72 +195,9 @@ export function start() {
         });
 
     watcherCmd
-        .on("add", (filePath) => {
-            // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
-            lockBot();
-
-            const { file, dir } = getFileDir(filePath);
-            if (!file || !dir) {
-                console.error(
-                    `[ERROR] | WatcherCmd add: failed to extract filename and dir from filePath: ${filePath}`,
-                );
-                return;
-            }
-
-            const guild_id = getGuildId(dir);
-            loadCommand(file, folders.commands[dir]);
-            sendCommands(guild_id);
-            console.log(getCommands());
-
-            console.log(`[WATCHER] | Added: ${filePath}`);
-
-            // Unlock bot once hot-reload is complete
-            unlockBot();
-        })
-        .on("change", (filePath) => {
-            // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
-            lockBot();
-
-            const { file, dir } = getFileDir(filePath);
-            if (!file || !dir) {
-                console.error(
-                    `[ERROR] | WatcherCmd change: failed to extract filename and dir from filePath: ${filePath}`,
-                );
-                return;
-            }
-
-            const guild_id = getGuildId(dir);
-            loadCommand(file, folders.commands[dir]);
-            sendCommands(guild_id);
-            console.log(getCommands());
-
-            console.log(`[WATCHER] | Changed: ${filePath}`);
-
-            // Unlock bot once hot-reload is complete
-            unlockBot();
-        })
-        .on("unlink", (filePath) => {
-            // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
-            lockBot();
-
-            const { file, dir } = getFileDir(filePath);
-            if (!file || !dir) {
-                console.error(
-                    `[ERROR] | WatcherCmd unlink: failed to extract filename and dir from filePath: ${filePath}`,
-                );
-                return;
-            }
-
-            const guild_id = getGuildId(dir);
-            unloadCommand(file, filePath, getGuildCommands(guild_id));
-            sendCommands(guild_id);
-            console.log(getCommands());
-
-            console.log(`[WATCHER] | Unlinked: ${filePath}`);
-
-            // Unlock bot once hot-reload is complete
-            unlockBot();
-        });
+        .on("add", (filePath) => commandWatcherHandler(filePath, "add"))
+        .on("change", (filePath) => commandWatcherHandler(filePath, "change"))
+        .on("unlink", (filePath) => commandWatcherHandler(filePath, "unlink"));
 
     watcherCfg
         .on("add", (filePath) => {

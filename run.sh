@@ -10,7 +10,13 @@ rm -rf ./dist/*
 mkdir -p dist/{commands,tasks}/{public,dev} dist/data dist/temp
 
 # Run TypeScript compiler & watcher
-npx tsc --watch &
+rm ./.tsbuildinfo
+npx tsc
+if [ $? -ne 0 ]; then
+    echo "❌ Initial TypeScript compilation failed. Exiting."
+    exit 1
+fi
+npx tsc --watch --preserveWatchOutput --incremental &
 
 # Send .env file & bot data over
 cp -r .env src/data dist/
