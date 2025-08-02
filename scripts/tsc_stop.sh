@@ -21,7 +21,7 @@ while read -r event; do
 	if ! docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" | grep -q true; then
 		echo "[$(date)] Container $CONTAINER_NAME is not running anymore. Cleaning up..."
 		pkill -f "tsc --watch"
-		exit 0
+		break
 	else
 		echo "[$(date)] Container $CONTAINER_NAME restarted, skipping cleanup."
 	fi

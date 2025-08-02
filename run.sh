@@ -1,13 +1,17 @@
 #!/bin/bash
 clear 2> /dev/null
 
+# Make sure scripts are runnable
+chmod +x ./scripts/tsc_stop.sh
+chmod +x ./scripts/attach_logs.sh
+
 # Try to kill older tsc process
 pkill -f "tsc --watch"
 
 # Clean dist
+rm -rf dist
 mkdir -p dist db
-rm -rf ./dist/*
-mkdir -p dist/{commands,tasks}/{public,dev} dist/data dist/temp
+mkdir -p dist/{commands,tasks}/{public,dev} dist/data dist/temp dist/db
 
 # Run TypeScript compiler & watcher
 rm ./.tsbuildinfo
@@ -30,26 +34,4 @@ setsid ./scripts/tsc_stop.sh "$CONTAINER_NAME" < /dev/null &
 docker compose up --build -d
 
 # Ensure we follow logs
-while true; do
-	sleep 1
-	# Check container status
-	status=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
-	echo $status
-
-	if [ "$status" = "running" ]; then
-		echo "Container (re)started, attaching to new logs..."
-		docker logs --since 2s -f "$CONTAINER_NAME"
-		
-		code=$?
-		if [ $code -eq 1 ]; then
-			echo "Interrupted by user (Ctrl+C). Exiting loop."
-			break
-		else
-			echo "Container stop."
-			sleep 1
-		fi
-	else
-		sleep 2
-		break
-	fi
-done
+./scripts/attach_logs.sh "$CONTAINER_NAME"

@@ -1,3 +1,23 @@
+type Task = {
+    data: {
+        [key: string]: any;
+        name: string;
+        interval?: null | number; // interval in minutes
+        time?: null | string | string[]; // tod to activate it, format "HH:MM" (can be an array)
+        // if neither interval nor time is provided, task can only be run if runOnStart is set to true
+        autoStart?: null | boolean; // task will auto activate on every bot startup if true
+        runOnStart?: null | boolean; // run once on bot startup (counts for repeats)
+        repeat?: null | number; // 0 means infinite, once all repetitions are done, will need to be manually reactivated
+
+        // Added by the loader
+        activated?: boolean;
+        nextTimestamp?: number;
+        repeats?: number;
+    };
+
+    run: () => Promise<void>;
+};
+
 /*
 Overall the same as commandLoader.js, with a few tweaks
 */
@@ -9,8 +29,8 @@ import { computeNextTimestamp } from "./taskUtils";
 
 // Dynamically loaded tasks
 const tasks = {
-    public: new Map<string, any>(),
-    dev: new Map<string, any>(),
+    public: new Map<string, Task>(),
+    dev: new Map<string, Task>(),
 };
 const publicDir = "./tasks/public/";
 const devDir = "./tasks/dev/";
@@ -22,7 +42,7 @@ const getTargetMap = (guildId: string): Map<string, any> | undefined =>
           ? tasks.dev
           : undefined;
 
-export function deactivateTask(task: any) {
+export function deactivateTask(task: Task) {
     task.data.activated = false;
     task.data.nextTimestamp = undefined;
     return true;
@@ -46,12 +66,13 @@ export function deactivateTaskByName(taskName: string, guildId: string) {
 }
 
 // Also resets repeats
-export function activateTask(task: any) {
+export function activateTask(task: Task) {
     task.data.activated = true;
-    if (task.data.repeat > 0) task.data.repeats = task.data.repeat;
+    if (task.data.repeat && task.data.repeat > 0)
+        task.data.repeats = task.data.repeat;
     try {
         task.data.nextTimestamp = task.data.runOnStart
-            ? Date.now()
+            ? 0
             : computeNextTimestamp(task.data);
     } catch (e) {
         console.error(`[ERROR] Task Activate:`, e);
@@ -123,13 +144,13 @@ export function loadTask(file: string, dir: string) {
 
     try {
         // Load task to require memory
-        const task = require(filePath);
+        const task: Task = require(filePath);
 
         if ("data" in task && "run" in task) {
             // Load task to map
             task.data.guildId = guildId; // Used later in taskRunner and available in task.run()
             targetMap.set(task.data.name, task);
-            if (task.data.autostart)
+            if (task.data.autostart || task.data.runOnStart)
                 activateTaskByName(task.data.name, guildId);
         } else {
             console.warn(
@@ -157,7 +178,7 @@ export function initTaskLoad() {
         .forEach((file) => loadTask(file, devDir));
 }
 
-export const getGuildTasks = (guildId: string): Map<string, any> => {
+export const getGuildTasks = (guildId: string): Map<string, Task> => {
     switch (guildId) {
         case process.env.DEV_GUILD_ID:
             return tasks.dev;

@@ -17,10 +17,7 @@ module.exports = {
     data: {
         name: "Update Help Command",
         interval: 5, // interval in minutes
-        time: null, // tod to activate it, format "HH:MM" (can be an array)
-        autostart: true, // task will auto activate on every bot startup if true
         runOnStart: true, // run once on bot startup
-        repeat: 0, // 0 means infinite, once all repetitions are done, will need to be manually reactivated
     },
     run: updateHelp,
 };

@@ -8,7 +8,7 @@ let intervalId: NodeJS.Timeout | null = null;
 export function startTaskRunner() {
     if (intervalId) return;
     // run once to validate all "RunOnStart" tasks
-    checker();
+    setTimeout(checker, 1_000); // initial run (because just calling the function doesn't work for some reason ???)
     intervalId = setInterval(checker, 60_000); // check every minute
 }
 
@@ -69,6 +69,7 @@ async function checker() {
                 );
             } else if (
                 task.data.activated &&
+                typeof task.data.nextTimestamp === "number" &&
                 task.data.nextTimestamp <= now.getTime()
             ) {
                 // console.log(now.getHours() + ":" + now.getMinutes());
