@@ -51,7 +51,7 @@ async function runTask(task: any) {
     }
 
     console.log(
-        `[TASK] Task ${task.data.name} ran succesfully, and next timestamp has been set. (${new Date(task.data.nextTimestamp)})`,
+        `[TASK] Task ${task.data.name} ran succesfully, and next timestamp has been set. (${new Date(task.data.nextTimestamp).toString()})`,
     );
 }
 

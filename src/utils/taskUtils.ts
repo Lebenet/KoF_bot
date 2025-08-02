@@ -67,7 +67,10 @@ export function computeNextTimestamp(data: any) {
         return target.getTime();
     } else if (data.interval) {
         // now + interval
-        return now.getTime() + data.interval * 60 * 1000;
+        let next: number = now.getTime() + data.interval * 60 * 1000;
+        // Difference (offset) due to checker
+        if (data.nextTimestamp) next -= now.getTime() - data.nextTimestamp;
+        return next;
     }
 
     throw new Error("No valid time or interval set.");
