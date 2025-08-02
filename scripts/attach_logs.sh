@@ -17,7 +17,7 @@ while true; do
 		docker logs --since 2s -f "$CONTAINER_NAME"
 		
 		code=$?
-		if [ $code -eq 1 ]; then
+		if [ "$code" -eq 1 ] || [ "$code" -eq 130 ]; then
 			echo "Interrupted by user (Ctrl+C). Exiting loop."
 			break
 		else
