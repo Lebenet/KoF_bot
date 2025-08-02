@@ -16,7 +16,7 @@ if [ $? -ne 0 ]; then
     echo "❌ Initial TypeScript compilation failed. Exiting."
     exit 1
 fi
-setsid npx tsc --watch --preserveWatchOutput --incremental > tsc.log 2>&1 < /dev/null &
+setsid npx tsc --watch --preserveWatchOutput --incremental < /dev/null &
 
 # Send .env file & bot data over
 cp -r .env src/data dist/
@@ -24,26 +24,7 @@ cp -r .env src/data dist/
 # If stopping the container: cleanup compiler
 CONTAINER_NAME="kof-bot"
 
-docker events \
-  --filter "event=stop" \
-  --filter "container=$CONTAINER_NAME" \
-  --since 1s |
-while read -r event; do
-	echo "[$(date)] Container $CONTAINER_NAME stopped event received."
-
-	# wait a moment before checking
-	sleep 3
-
-	# Check if container is still running
-	if ! docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" | grep -q true; then
-		echo "[$(date)] Container $CONTAINER_NAME is not running anymore. Cleaning up..."
-		pkill -f "tsc --watch"
-		tput rc; tput el
-		exit 0
-	else
-		echo "[$(date)] Container $CONTAINER_NAME restarted, skipping cleanup."
-	fi
-done &
+setsid ./scripts/tsc_stop.sh "$CONTAINER_NAME" < /dev/null &
 
 # Start docker
 docker compose up --build -d
@@ -56,9 +37,17 @@ while true; do
 	echo $status
 
 	if [ "$status" = "running" ]; then
+		echo "Container (re)started, attaching to new logs..."
 		docker logs --since 2s -f "$CONTAINER_NAME"
-		echo "Container restarted, attaching to new logs..."
-		sleep 1
+		
+		code=$?
+		if [ $code -eq 1 ]; then
+			echo "Interrupted by user (Ctrl+C). Exiting loop."
+			break
+		else
+			echo "Container stop."
+			sleep 1
+		fi
 	else
 		sleep 2
 		break
