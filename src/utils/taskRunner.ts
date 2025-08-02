@@ -1,4 +1,4 @@
-import { computeNextTimestamp, fakeParisTimeToUTC } from "./taskUtils";
+import { computeNextTimestamp, getParisDatetimeSQLiteSafe } from "./taskUtils";
 import { getTasks, deactivateTask } from "./taskLoader";
 import { getConfig } from "./configLoader";
 
@@ -61,7 +61,7 @@ async function checker() {
 
     for (const [, tasks] of Object.entries(allTasks)) {
         for (const [, task] of tasks) {
-            const now = fakeParisTimeToUTC();
+            const now = new Date(getParisDatetimeSQLiteSafe());
             // Safeguard (even though checked in taskLoader)
             if (typeof task.run !== "function") {
                 console.warn(
