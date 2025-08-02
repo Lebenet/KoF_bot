@@ -2,7 +2,7 @@ import chokidar from "chokidar";
 import fs from "fs";
 import path from "path";
 
-let cmdUpdateTimeout: NodeJS.Timeout | null = null;
+const timeoutsMap = new Map<string, NodeJS.Timeout>();
 
 import {
     initCmdLoad,
@@ -82,7 +82,7 @@ function commandWatcherHandler(filePath: string, event: string) {
         return;
     }
 
-    const guild_id = getGuildId(dir);
+    const guildId = getGuildId(dir);
 
     switch (event) {
         case "add":
@@ -90,19 +90,24 @@ function commandWatcherHandler(filePath: string, event: string) {
             loadCommand(file, folders.commands[dir]);
             break;
         case "unlink":
-            unloadCommand(file, filePath, getGuildCommands(guild_id));
+            unloadCommand(file, filePath, getGuildCommands(guildId));
             break;
         default:
             console.log(`[WARN] Command Watcher: Unhandled event ${event}.`);
     }
 
-    if (cmdUpdateTimeout) clearTimeout(cmdUpdateTimeout);
-
-    cmdUpdateTimeout = setTimeout(() => {
-        sendCommands(guild_id);
-        console.log(getCommands());
-        cmdUpdateTimeout = null;
-    }, 1_000);
+    const tmt = timeoutsMap.get(guildId);
+    if (tmt) tmt.refresh();
+    else
+        timeoutsMap.set(
+            guildId,
+            setTimeout(() => {
+                sendCommands(guildId);
+                loadCommand("help.js", folders.commands[dir]);
+                console.log(getCommands());
+                timeoutsMap.delete(guildId);
+            }, 1_000),
+        );
 
     console.log(
         `[WATCHER] ${event}${event === "change" ? "" : "e"}d: ${filePath}`,
