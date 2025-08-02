@@ -41,7 +41,7 @@ export function computeNextTimestamp(data: any) {
     // Task deactivated or no repeats left
     if (!data.activated || data.repeats === 0) return undefined;
 
-    const now = fakeParisTimeToUTC();
+    const now = new Date(getParisDatetimeSQLiteSafe()); // fakeParisTimeToUTC();
 
     if (data.time) {
         // Handle both string and array of strings
