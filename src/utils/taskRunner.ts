@@ -7,6 +7,8 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export function startTaskRunner() {
     if (intervalId) return;
+    // run once to validate all "RunOnStart" tasks
+    checker();
     intervalId = setInterval(checker, 60_000); // check every minute
 }
 
