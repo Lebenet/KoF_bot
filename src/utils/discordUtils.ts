@@ -315,7 +315,7 @@ export async function updateSkills(
     }
 
     const playerId = user.player_id;
-    if (!user.player_id)
+    if (!playerId)
         return {
             success: false,
             error: "Cet utilisateur n'est pas link. Merci de faire `/link`.",

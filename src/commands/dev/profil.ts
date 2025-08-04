@@ -139,7 +139,8 @@ function getComponents(dsk: boolean, target: string, author: string) {
             gotoSkillsBut,
             updateSkillsBut,
         ),
-        /*
+    ];
+    /*
         new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
             new ButtonBuilder()
                 .setCustomId(`|profil|delHandler|${target}|${author}`)
@@ -148,7 +149,6 @@ function getComponents(dsk: boolean, target: string, author: string) {
                 .setEmoji("🚮"),
         ),
 		*/
-    ];
 }
 
 async function profil(
