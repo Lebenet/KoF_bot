@@ -171,6 +171,7 @@ async function profil(
     interaction.reply({
         embeds: embeds,
         components: components,
+        flags: MessageFlags.Ephemeral,
     });
 }
 
@@ -234,6 +235,7 @@ async function updateSkillsHandler(
 }
 
 async function delHandler(interaction: ButtonInteraction, _config: Config) {
+    /*
     const [, , , targetId, authorId] = interaction.customId.split("|");
     if (![targetId, authorId].includes(interaction.user.id)) {
         interaction.reply({
@@ -243,6 +245,7 @@ async function delHandler(interaction: ButtonInteraction, _config: Config) {
         setTimeout(() => interaction.deleteReply(), 3_000);
         return;
     }
+	*/
 
     interaction.message.delete();
 }

@@ -4,6 +4,7 @@ import {
     EmbedBuilder,
     Colors,
     MessageFlags,
+    MessageActivityType,
 } from "discord.js";
 import {
     getCommandsHelper,
@@ -45,6 +46,7 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
                     .join("\n"),
             },
         ]);
+        /*
         interaction.user.send({
             embeds: [embed],
         });
@@ -52,11 +54,20 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
             content: "Réponse envoyée en DM !",
             flags: MessageFlags.Ephemeral,
         });
+        */
+        interaction.reply({
+            embeds: [embed],
+            flags: MessageFlags.Ephemeral,
+        });
         return;
     }
 
     const command = getGuildCommands(interaction.guildId!).get(commandName);
-    if (command.help) interaction.reply({ embeds: [command.help()] });
+    if (command.help)
+        interaction.reply({
+            embeds: [command.help()],
+            flags: MessageFlags.Ephemeral,
+        });
     else
         interaction.reply({
             content: "Cette commande n'a pas de message d'aide défini !",
