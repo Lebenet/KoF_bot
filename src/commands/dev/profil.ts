@@ -139,6 +139,7 @@ function getComponents(dsk: boolean, target: string, author: string) {
             gotoSkillsBut,
             updateSkillsBut,
         ),
+        /*
         new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
             new ButtonBuilder()
                 .setCustomId(`|profil|delHandler|${target}|${author}`)
@@ -146,6 +147,7 @@ function getComponents(dsk: boolean, target: string, author: string) {
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji("🚮"),
         ),
+		*/
     ];
 }
 
@@ -234,8 +236,9 @@ async function updateSkillsHandler(
     });
 }
 
+// MEssage put to ephemeral: no need anymore
+/*
 async function delHandler(interaction: ButtonInteraction, _config: Config) {
-    /*
     const [, , , targetId, authorId] = interaction.customId.split("|");
     if (![targetId, authorId].includes(interaction.user.id)) {
         interaction.reply({
@@ -245,10 +248,10 @@ async function delHandler(interaction: ButtonInteraction, _config: Config) {
         setTimeout(() => interaction.deleteReply(), 3_000);
         return;
     }
-	*/
 
     interaction.message.delete();
 }
+*/
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -274,7 +277,7 @@ module.exports = {
     gotoProfileHandler: gotoProfileHandler,
     gotoSkillsHandler: gotoSkillsHandler,
     updateSkillsHandler: updateSkillsHandler,
-    delHandler: delHandler,
+    // delHandler: delHandler,
 
     help: () =>
         primaryEmbed({
