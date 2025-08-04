@@ -1,12 +1,45 @@
 // Imports
 import fs from "fs";
 import path from "path";
-import { REST, Routes } from "discord.js";
+import {
+    ChatInputCommandInteraction,
+    EmbedBuilder,
+    Interaction,
+    REST,
+    Routes,
+    SlashCommandBuilder,
+} from "discord.js";
+import { Config } from "../db/dbTypes";
+
+export type SubInteractionHandler = (...args: [Interaction, Config]) => void;
+
+export type Command = {
+    execute: (...args: [ChatInputCommandInteraction, Config]) => void;
+    data: SlashCommandBuilder;
+    help?: () => EmbedBuilder;
+} & {
+    [key: string]: SubInteractionHandler | any;
+};
+
+export type Commands = {
+    public: Map<string, Command>;
+    dev: Map<string, Command>;
+    toString: () => string;
+};
 
 // Dynamically loaded commands
-const commands = {
-    public: new Map<string, any>(),
-    dev: new Map<string, any>(),
+const commands: Commands = {
+    public: new Map<string, Command>(),
+    dev: new Map<string, Command>(),
+    toString: () => {
+        let res = "Dev: {\n";
+        res += [...commands.dev.keys()].map((k) => "- " + k).join("\n");
+        res += "\n}\n";
+        res += "Public: {\n";
+        res += [...commands.public.keys()].map((k) => "- " + k).join("\n");
+        res += "\n}\n";
+        return res;
+    },
 };
 const publicDir = "./commands/public/";
 const devDir = "./commands/dev/";
@@ -14,7 +47,7 @@ const devDir = "./commands/dev/";
 export function unloadCommand(
     file: string,
     filePath: string,
-    targetMap: Map<string, any>,
+    targetMap: Map<string, Command>,
 ) {
     // Delete command from require memory
     try {
@@ -29,7 +62,7 @@ export function unloadCommand(
 }
 
 export function loadCommand(file: string, dir: string) {
-    const targetMap: Map<string, any> | undefined =
+    const targetMap: Map<string, Command> | undefined =
         dir === devDir
             ? commands.dev
             : dir === publicDir
@@ -44,13 +77,13 @@ export function loadCommand(file: string, dir: string) {
         return;
     }
     const filePath = path.resolve(path.join(dir, file));
-    console.log(filePath, file, dir);
+    // console.log(filePath, file, dir);
 
     unloadCommand(file, filePath, targetMap);
 
     try {
         // Load command to require memory
-        const command = require(filePath);
+        const command: Command = require(filePath);
 
         if ("data" in command && "execute" in command) {
             // Load command to map
@@ -90,14 +123,14 @@ export const getGuildCommands = (guildId: string) => {
             console.warn(
                 `[WARN] | Member of an unauthorized server tried to execute a command. Guild ID: ${guildId}`,
             );
-            return new Map<string, any>();
+            return new Map<string, Command>();
     }
 };
 
 export const getCommands = () => commands;
-export const getSlashCommands = (cmds: Map<string, any>) =>
+export const getSlashCommands = (cmds: Map<string, Command>) =>
     new Map([...cmds].filter(([_k, c]) => typeof c.execute === "function"));
-export const getCommandsArray = (cmds: Map<string, any>) => [
+export const getCommandsArray = (cmds: Map<string, Command>) => [
     ...cmds.values().map((cmd) => cmd.data.toJSON()),
 ];
 

@@ -175,6 +175,14 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         const [commandName, handlerName] = customIdArgs.slice(1, 3);
 
         const command = getGuildCommands(guildId).get(commandName);
+        if (!command) {
+            await handleDeferredReply(
+                interaction,
+                "Commande n'existe pas selon le bot?",
+                MessageFlags.Ephemeral,
+            );
+            return;
+        }
 
         // If saved modal resent to the user
         if (!interaction.guildId)
@@ -218,6 +226,14 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         const [commandName, handlerName] = customIdArgs.slice(1, 3);
 
         const command = getGuildCommands(guildId).get(commandName);
+        if (!command) {
+            await handleDeferredReply(
+                interaction,
+                "Commande n'existe pas selon le bot?",
+                MessageFlags.Ephemeral,
+            );
+            return;
+        }
 
         try {
             command[handlerName](interaction, config);
@@ -249,6 +265,14 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         const [commandName, handlerName] = customIdArgs.slice(1, 3);
 
         const command = getGuildCommands(guildId).get(commandName);
+        if (!command) {
+            await handleDeferredReply(
+                interaction,
+                "Commande n'existe pas selon le bot?",
+                MessageFlags.Ephemeral,
+            );
+            return;
+        }
 
         try {
             command[handlerName](interaction, config);

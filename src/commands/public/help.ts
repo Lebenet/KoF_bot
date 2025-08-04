@@ -56,6 +56,13 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     }
 
     const command = getGuildCommands(interaction.guildId!).get(commandName);
+    if (!command) {
+        interaction.reply({
+            content: "Commande inconnue du bot ?",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
     if (command.help) interaction.reply({ embeds: [command.help()] });
     else
         interaction.reply({

@@ -1,21 +1,29 @@
-type Task = {
-    data: {
-        [key: string]: any;
-        name: string;
-        interval?: null | number; // interval in minutes
-        time?: null | string | string[]; // tod to activate it, format "HH:MM" (can be an array)
-        // if neither interval nor time is provided, task can only be run if runOnStart is set to true
-        autoStart?: null | boolean; // task will auto activate on every bot startup if true
-        runOnStart?: null | boolean; // run once on bot startup (counts for repeats)
-        repeat?: null | number; // 0 means infinite, once all repetitions are done, will need to be manually reactivated
+export type TaskDataLoad = {
+    name: string;
+    interval?: null | number; // interval in minutes
+    time?: null | string | string[]; // tod to activate it, format "HH:MM" (can be an array)
+    // if neither interval nor time is provided, task can only be run if runOnStart is set to true
+    autoStart?: null | boolean; // task will auto activate on every bot startup if true
+    runOnStart?: null | boolean; // run once on bot startup (counts for repeats)
+    repeat?: null | number; // 0 means infinite, once all repetitions are done, will need to be manually reactivated
+};
 
-        // Added by the loader
-        activated?: boolean;
-        nextTimestamp?: number;
-        repeats?: number;
-    };
+export type TaskData = {
+    [key: string]: any;
+    activated?: boolean;
+    nextTimestamp?: number;
+    repeats?: number;
+} & TaskDataLoad;
 
-    run: () => Promise<void>;
+export type Task = {
+    data: TaskData;
+    run: (...args: [TaskData, Config]) => Promise<void>;
+};
+
+export type Tasks = {
+    public: Map<string, Task>;
+    dev: Map<string, Task>;
+    toString: () => string;
 };
 
 /*
@@ -26,11 +34,21 @@ Overall the same as commandLoader.js, with a few tweaks
 import fs from "fs";
 import path from "path";
 import { computeNextTimestamp } from "./taskUtils";
+import { Config } from "../db/dbTypes";
 
 // Dynamically loaded tasks
-const tasks = {
+const tasks: Tasks = {
     public: new Map<string, Task>(),
     dev: new Map<string, Task>(),
+    toString: () => {
+        let res = "Dev: {\n";
+        res += [...tasks.dev.keys()].map((k) => "- " + k).join("\n");
+        res += "\n}\n";
+        res += "Public: {\n";
+        res += [...tasks.public.keys()].map((k) => "- " + k).join("\n");
+        res += "\n}\n";
+        return res;
+    },
 };
 const publicDir = "./tasks/public/";
 const devDir = "./tasks/dev/";

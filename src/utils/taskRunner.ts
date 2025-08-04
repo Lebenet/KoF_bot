@@ -60,6 +60,7 @@ async function checker() {
     const allTasks = getTasks();
 
     for (const [, tasks] of Object.entries(allTasks)) {
+        if (typeof tasks === "function") continue;
         for (const [, task] of tasks) {
             const now = new Date(getParisDatetimeSQLiteSafe());
             // Safeguard (even though checked in taskLoader)

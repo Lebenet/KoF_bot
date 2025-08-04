@@ -54,7 +54,10 @@ export function getCommandsHelper(
                 name: k,
                 value: k,
                 args: [
-                    ...(commands.get(k).data as SlashCommandBuilder)
+                    ...(
+                        (commands.get(k)?.data as SlashCommandBuilder) ??
+                        new SlashCommandBuilder().setName("Unknown")
+                    )
                         .toJSON()
                         .options!.map(
                             (option) =>

@@ -63,7 +63,7 @@ function taskWatcherHandler(filePath: string, event: string) {
             console.log(`[WARN] Task Watcher: Unhandled event ${event}.`);
     }
 
-    console.log(getTasks());
+    console.log(getTasks().toString());
 
     console.log(
         `[WATCHER](Task) ${event}${event === "change" ? "" : "e"}d: ${filePath}`,
@@ -102,9 +102,9 @@ function commandWatcherHandler(filePath: string, event: string) {
         timeoutsMap.set(
             guildId,
             setTimeout(() => {
-                sendCommands(guildId);
                 loadCommand("help.js", folders.commands[dir]);
-                console.log(getCommands());
+                sendCommands(guildId);
+                console.log(getCommands().toString());
                 timeoutsMap.delete(guildId);
             }, 1_000),
         );
@@ -120,7 +120,7 @@ function commandWatcherHandler(filePath: string, event: string) {
 function getFileDir(filePath: string) {
     const file = path.basename(filePath);
     const dir = path.dirname(filePath);
-    console.log(file, dir); // FIXME: TO TEST
+
     return { file, dir };
 }
 
@@ -147,7 +147,7 @@ export function start() {
     // Load commands
     initCmdLoad();
     const commands = getCommands();
-    console.log("commands:\n", commands);
+    console.log("commands:\n", commands.toString());
 
     // Register slash commands to discord
     sendCommands(process.env.DEV_GUILD_ID ?? "");
@@ -156,7 +156,7 @@ export function start() {
     // Load tasks
     initTaskLoad();
     const tasks = getTasks();
-    console.log("Tasks:\n", tasks);
+    console.log("Tasks:\n", tasks.toString());
 
     const watcherTask = chokidar.watch(["./tasks/public/", "./tasks/dev/"], {
         persistent: true, // runs as long as the bot is up
