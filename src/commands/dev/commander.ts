@@ -1087,6 +1087,10 @@ async function advanceItemHandler(
     }
 
     const quantity = Number(qtyRaw.value.replace(/\s_,-/g, ""));
+    if (quantity <= 0) {
+        interaction.editReply("Merci de rentrer un nombre >= 0 !");
+        return;
+    }
 
     item.progress = Math.min(item.quantity, item.progress + quantity);
     if (!item.update()) {
