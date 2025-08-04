@@ -28,6 +28,7 @@ import {
     UserSelectMenuBuilder,
     UserSelectMenuInteraction,
     Message,
+    MessageType,
 } from "discord.js";
 
 import {
@@ -120,7 +121,7 @@ async function order(
             ),
         );
 
-    await interaction.showModal(initModal);
+    interaction.showModal(initModal);
 }
 
 async function initHandler(
@@ -199,6 +200,12 @@ async function initHandler(
             .setLabel("Fermer")
             .setStyle(ButtonStyle.Danger);
 
+        // To add items
+        const addItemsBut = new ButtonBuilder()
+            .setCustomId(`|commander|addItemsSend|${command.id}`)
+            .setLabel("Ajouter Items")
+            .setStyle(ButtonStyle.Secondary);
+
         // Profession select menu
         const opts = getProfessionsStringSelectMessageComp();
         const profs = new StringSelectMenuBuilder()
@@ -213,7 +220,13 @@ async function initHandler(
                 readyBut,
                 closeBut,
             );
+
         const row2 =
+            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                addItemsBut,
+            );
+
+        const row3 =
             new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
                 profs,
             );
@@ -253,7 +266,7 @@ async function initHandler(
 
         const msg = await thread.send({
             embeds: [message],
-            components: [row1, row2],
+            components: [row1, row2, row3],
         });
 
         msg.pin();
@@ -474,6 +487,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
             claimBut,
             delBut,
         );
+    const msgRow2 = msg.components[1];
 
     // Get panel to send message to
     const ppanel = new ChannelParam();
@@ -495,26 +509,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     }
 
     // Build panel embed
-    const embed = new EmbedBuilder()
-        .setColor(Colors.DarkAqua)
-        .setTitle(`Nouvelle commande ! (${command.c_name})`)
-        .setDescription(command.description!)
-        .addFields(
-            { name: "Coffre de dépôt", value: command.chest!, inline: true },
-            {
-                name: "Matérieux fournis:",
-                value: command.self_supplied ? "Oui." : "Non.",
-                inline: true,
-            },
-            msg.embeds[0].fields.find((f) =>
-                f.name.toLowerCase().includes("professions"),
-            ) ?? {
-                name: "Professions",
-                value: "Pas précisé.",
-                inline: false,
-            },
-            { name: "Items:", value: "", inline: false },
-        );
+    const embed = getPanelEmbed(command);
 
     // Assign provider panel
     const assignMenu = new UserSelectMenuBuilder()
@@ -550,7 +545,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     // Only edit after ready has been updated on database
     msg.edit({
         embeds: [msgEmbed],
-        components: [msgRow],
+        components: [msgRow, msgRow2],
     });
 
     interaction.deleteReply();
@@ -575,12 +570,12 @@ async function assignHandler(
     // TODO: only propose knows providers of the right professions instead of anyone
     //   - Change interaction from UserSelectMenu to StringSelectMenu with the usernames of the providers
 
-    const chan = new ChannelParam();
-    chan.command_param = "commandes_channel_id";
-    chan.command_name = "commander";
-    chan.guild_id = interaction.guildId!;
-
-    if (!chan.sync()) {
+    const chan = ChannelParam.getParam(
+        interaction.guildId!,
+        "commander",
+        "commandes_channel_id",
+    );
+    if (!chan) {
         await interaction.editReply(
             "Le salon de commandes n'a pas été setup ! Merci de faire `/setup_commandes` ou de contacter un admin.",
         );
@@ -644,29 +639,7 @@ async function assignHandler(
     }
 
     // Edit assigned members
-    const oldEmbed = interaction.message.embeds[0];
-    const embed = EmbedBuilder.from(oldEmbed);
-    const assignees = CommandAssignee.fetch({
-        keys: "command_id",
-        values: command.id,
-        array: true,
-    }) as CommandAssignee[];
-
-    if (oldEmbed.fields.some((f) => f.name === "Assignés"))
-        embed.setFields(
-            oldEmbed.fields.map((f) => {
-                if (f.name !== "Assignés") return f;
-                return {
-                    name: "Assignés",
-                    value: assignees.map((a) => `<@${a.user_id}>`).join(", "),
-                };
-            }),
-        );
-    else
-        embed.addFields({
-            name: "Assignés",
-            value: assignees.map((a) => `<@${a.user_id}>`).join(", "),
-        });
+    const embed = getPanelEmbed(command);
 
     interaction.message.edit({
         content: interaction.message.content,
@@ -696,11 +669,12 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
     if (interaction.channelId === command.thread_id) {
         thread = interaction.channel as ThreadChannel;
 
-        const panel = new ChannelParam();
-        panel.command_param = "panel_channel_id";
-        panel.command_name = "commander";
-        panel.guild_id = interaction.guildId!;
-        if (!panel.sync()) {
+        const panel = ChannelParam.getParam(
+            interaction.guildId!,
+            "commander",
+            "panel_channel_id",
+        );
+        if (!panel) {
             await interaction.editReply(
                 "Il faut setup le bot! Faut faire `/setup_commandes` ou contacter un admin.",
             );
@@ -711,11 +685,12 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             config.bot.channels.cache.get(panel.channel_id) as TextChannel
         ).messages.cache.get(command.panel_message_id!) as Message;
     } else {
-        const chan = new ChannelParam();
-        chan.command_param = "commandes_channel_id";
-        chan.command_name = "commander";
-        chan.guild_id = interaction.guildId!;
-        if (!chan.sync()) {
+        const chan = ChannelParam.getParam(
+            interaction.guildId!,
+            "commander",
+            "commandes_channel_id",
+        );
+        if (!chan) {
             await interaction.editReply(
                 "Il faut setup le bot! Faut faire `/setup_commandes` ou contacter un admin.",
             );
@@ -750,36 +725,420 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 
     thread.members.add(interaction.user);
 
-    const embed = panelMsg.embeds[0];
-    const newEmbed = EmbedBuilder.from(embed);
-    const assignees = CommandAssignee.fetch({
-        keys: "command_id",
-        values: command.id,
-        array: true,
-    }) as CommandAssignee[];
-
-    if (embed.fields.some((f) => f.name === "Assignés"))
-        newEmbed.setFields(
-            embed.fields.map((f) => {
-                if (f.name !== "Assignés") return f;
-                return {
-                    name: "Assignés",
-                    value: assignees.map((a) => `<@${a.user_id}>`).join(", "),
-                };
-            }),
-        );
-    else
-        newEmbed.addFields({
-            name: "Assignés",
-            value: assignees.map((a) => `<@${a.user_id}>`).join(", "),
-        });
+    const embed = getPanelEmbed(command);
 
     panelMsg.edit({
         content: panelMsg.content,
-        embeds: [newEmbed],
+        embeds: [embed],
         components: panelMsg.components,
     });
 
+    interaction.deleteReply();
+}
+
+async function addItemsSend(interaction: ButtonInteraction, config: Config) {
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    if (!command.sync()) {
+        interaction.reply({
+            content:
+                "Erreur de Database, pas réussi à enregistrer l'interaction.",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
+
+    if (
+        interaction.user.id !== command.author_id &&
+        !config.admins?.includes(interaction.user.id)
+    ) {
+        interaction.reply({
+            content: "Cette commande ne vous appartient pas.",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
+
+    // Create modal
+    const modal = new ModalBuilder()
+        .setCustomId(`|commander|addItemsHandler|${command.id}`)
+        .setTitle("Format: <num> <item> ou <item> X<num>");
+
+    // Generate fields
+    const components = Array.from({ length: 5 }, (_, i) => {
+        return new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+                .setCustomId(i.toString())
+                .setLabel(`Item ${i + 1}`)
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setPlaceholder("optionnel"),
+        );
+    });
+
+    // Add fields
+    modal.addComponents(components);
+
+    // Send modal
+    interaction.showModal(modal);
+}
+
+function getPanelEmbed(command: Command): EmbedBuilder {
+    return new EmbedBuilder()
+        .setTitle(`${command.c_name}`)
+        .setDescription(command.description)
+        .setColor(Colors.DarkAqua)
+        .setFooter({ text: "Dernière update:" })
+        .setTimestamp()
+        .setFields([
+            { name: "Coffre de dépôt:", value: command.chest, inline: true },
+            {
+                name: "Matériaux fournis:",
+                value: command.self_supplied ? "Oui." : "Non.",
+                inline: true,
+            },
+            {
+                name: "Professions:",
+                value:
+                    CommandProfession.fetchArray({
+                        keys: "command_id",
+                        values: command.id,
+                    })
+                        .map((p) => p.profession_name)
+                        .join(", ") || "Pas précisé.",
+            },
+            {
+                name: "Items",
+                value:
+                    CommandItem.fetchArray({
+                        keys: "command_id",
+                        values: command.id,
+                    })
+                        .toSorted(
+                            (i1, i2) =>
+                                i2.quantity -
+                                i2.progress -
+                                (i1.quantity - i1.progress),
+                        )
+                        .map((i) =>
+                            i.progress >= i.quantity
+                                ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}]* - **${i.item_name}**~~`
+                                : `- \>${`**__${i.quantity - i.progress}__**`} *[${Math.min(i.progress, i.quantity)}/${i.quantity}]* - **${i.item_name}**`,
+                        )
+                        .join(",\n") || "Pas précisé.",
+            },
+            {
+                name: "Assignés",
+                value: CommandAssignee.fetchArray({
+                    keys: "command_id",
+                    values: command.id,
+                })
+                    .map((a) => `<@${a.user_id}>`)
+                    .join(", "),
+            },
+        ]);
+}
+
+async function updatePanel(command: Command, config: Config) {
+    const panelParam = ChannelParam.getParam(
+        command.guild_id,
+        "commander",
+        "panel_channel_id",
+    );
+    const panel = config.bot.channels.cache.get(panelParam?.channel_id!) as
+        | TextChannel
+        | undefined;
+    if (!panel) return;
+
+    panel.messages
+        .fetch(command.panel_message_id!)
+        .then((msg) => {
+            const embed = getPanelEmbed(command);
+            msg.edit({
+                content: msg.content,
+                embeds: [embed],
+                components: msg.components,
+            });
+        })
+        .catch(console.log);
+}
+
+async function addItemsHandler(
+    interaction: ModalSubmitInteraction,
+    config: Config,
+) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    if (!command.sync()) {
+        interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    // get thread
+    const channel = ChannelParam.getParam(
+        interaction.guildId!,
+        "commander",
+        "commandes_channel_id",
+    );
+    if (!channel) {
+        interaction.editReply("Salon de commandes a été retiré de la config!");
+        return;
+    }
+
+    const thread = await (
+        config.bot.channels.cache.get(channel.channel_id) as
+            | TextChannel
+            | ForumChannel
+    ).threads.fetch(command.thread_id);
+    if (!thread) return;
+
+    // Create items and send related messages
+    // const items: CommandItem[] = new Array<CommandItem>();
+    const patterns = [
+        // <num> <name>
+        /^([\d _-]+)\s+(.+)$/,
+        // <name> x|X<num>
+        /^([\w\s_-]+?(?:\s+[tT]\d+)?)\s+[xX]\s*([\d _-]+)$/,
+    ];
+
+    interaction.fields.fields.forEach(async (f) => {
+        const val = f.value.trim();
+        if (!val) return;
+
+        const item = new CommandItem();
+        item.command_id = command.id;
+
+        for (const pattern of patterns) {
+            const match = val.match(pattern);
+            if (!match) continue;
+
+            if (pattern === patterns[0]) {
+                item.item_name = match[2].trim();
+                item.quantity = Number(match[1].replace(/[\s_-]/g, ""));
+            } else {
+                item.item_name = match[1].trim();
+                item.quantity = Number(match[2].replace(/[\s_-]/g, ""));
+            }
+            break;
+        }
+        if (!item.item_name || !item.quantity) return;
+        item.progress = 0;
+
+        if (!item.insert()?.sync()) return;
+
+        // Create components
+        const advanceBut = new ButtonBuilder()
+            .setCustomId(`|commander|advanceItemSend|${command.id}|${item.id}`)
+            .setLabel("Avancer")
+            .setEmoji("➕")
+            .setStyle(ButtonStyle.Secondary);
+
+        const completeBut = new ButtonBuilder()
+            .setCustomId(
+                `|commander|completeItemHandler|${command.id}|${item.id}`,
+            )
+            .setLabel("Compléter")
+            .setEmoji("✅")
+            .setStyle(ButtonStyle.Success);
+
+        const msg = await thread.send({
+            content: `### 🔃 [0/${item.quantity}] - ${item.item_name}`,
+            components: [
+                new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                    [advanceBut, completeBut],
+                ),
+            ],
+        });
+
+        item.message_id = msg.id;
+        if (!item.update()) {
+            msg.delete();
+            item.delete();
+            return;
+        }
+        const collector = thread.createMessageCollector({
+            time: 3_000,
+            filter: (m) => m.type === MessageType.ChannelPinnedMessage,
+        });
+        collector.on("collect", async (m) => {
+            try {
+                await m.delete();
+            } catch {}
+        });
+        msg.pin();
+    });
+    if (command.panel_message_id) updatePanel(command, config);
+    interaction.deleteReply();
+}
+
+function updateItem(
+    command: Command,
+    item: CommandItem,
+    config: Config,
+    message?: Message<boolean>,
+) {
+    if (!message) {
+        const param = ChannelParam.getParam(
+            command.guild_id,
+            "commander",
+            "commandes_channel_id",
+        );
+        if (!param) return;
+        const threadSrc = config.bot.channels.cache.get(param.channel_id) as
+            | TextChannel
+            | ForumChannel
+            | undefined;
+        if (!threadSrc) return;
+        const thread = threadSrc.threads.cache.get(command.thread_id);
+        if (!thread) return;
+
+        thread.messages.fetch(item.message_id!).then((msg) => {
+            if (item.progress >= item.quantity) msg.delete();
+            else
+                msg.edit(
+                    `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
+                );
+        });
+    } else {
+        if (item.progress >= item.quantity) message.delete();
+        else
+            message.edit(
+                `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
+            );
+    }
+}
+
+async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
+    const commandId = interaction.customId.split("|")[3];
+    const itemId = interaction.customId.split("|")[4];
+
+    const command = new Command();
+    command.id = commandId;
+
+    const item = new CommandItem();
+    item.id = itemId;
+
+    if (!command.sync() || !item.sync()) {
+        interaction.reply({
+            content:
+                "Erreur de Database, pas réussi à enregistrer l'interaction.",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
+
+    if (
+        interaction.user.id !== command.author_id &&
+        !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
+            .map((a) => a.user_id)
+            .includes(interaction.user.id) &&
+        !config.admins?.includes(interaction.user.id)
+    ) {
+        interaction.reply({
+            content: "Cette commande ne vous appartient pas.",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
+
+    const modal = new ModalBuilder()
+        .setCustomId(`|commander|advanceItemHandler|${command.id}|${item.id}`)
+        .setTitle("Combien ?")
+        .addComponents([
+            new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
+                [
+                    new TextInputBuilder()
+                        .setCustomId(`quantity`)
+                        .setStyle(TextInputStyle.Short)
+                        .setLabel("Quantité :")
+                        .setRequired(true),
+                ],
+            ),
+        ]);
+
+    interaction.showModal(modal);
+}
+
+async function advanceItemHandler(
+    interaction: ModalSubmitInteraction,
+    config: Config,
+) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    const item = new CommandItem();
+    item.id = interaction.customId.split("|")[4];
+    if (!command.sync() || !item.sync()) {
+        interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    const qtyRaw = interaction.fields.getField("quantity");
+    if (!qtyRaw.value.trim().match(/\d?[\d\s,_-]+\d?/)) {
+        interaction.editReply("Mauvais format! Nombre uniquement svp");
+        return;
+    }
+
+    const quantity = Number(qtyRaw.value.replace(/\s_,-/g, ""));
+
+    item.progress = Math.min(item.quantity, item.progress + quantity);
+    if (!item.update()) {
+        interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    if (item.message_id) updateItem(command, item, config);
+    if (command.panel_message_id) updatePanel(command, config);
+    interaction.deleteReply();
+}
+
+async function completeItemHandler(
+    interaction: ButtonInteraction,
+    config: Config,
+) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    const item = new CommandItem();
+    item.id = interaction.customId.split("|")[4];
+    if (!command.sync() || !item.sync()) {
+        interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    if (
+        interaction.user.id !== command.author_id &&
+        !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
+            .map((a) => a.user_id)
+            .includes(interaction.user.id) &&
+        !config.admins?.includes(interaction.user.id)
+    ) {
+        interaction.editReply("Cette commande ne vous appartient pas.");
+        return;
+    }
+
+    item.progress = item.quantity;
+    if (!item.update()) {
+        interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    if (item.message_id) updateItem(command, item, config, interaction.message);
+    if (command.panel_message_id) updatePanel(command, config);
     interaction.deleteReply();
 }
 
@@ -790,11 +1149,19 @@ module.exports = {
 
     execute: order,
     initHandler: initHandler,
+
     assignHandler: assignHandler,
     claimHandler: claimHandler,
-    //addItemHandler: addItemHandler,
-    //completedItemsHandler: completedItemsHandler,
+
+    addItemsSend: addItemsSend,
+    addItemsHandler: addItemsHandler,
+
+    advanceItemSend: advanceItemSend,
+    advanceItemHandler: advanceItemHandler,
+    completeItemHandler: completeItemHandler,
+
     closeHandler: closeHandler,
     readyHandler: readyHandler,
+
     manageProfessionsHandler: manageProfessionsHandler,
 };

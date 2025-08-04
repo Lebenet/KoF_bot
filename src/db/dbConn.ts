@@ -100,11 +100,12 @@ const tables = [
 		PRIMARY KEY (command_id, profession_name)
 	);`,
     `CREATE TABLE IF NOT EXISTS CommandItems (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		item_name TEXT NOT NULL,
 		quantity INTEGER NOT NULL DEFAULT 1,
-		message_id TEXT NOT NULL,
-		PRIMARY KEY (command_id, item_name)
+		progress INTEGER NOT NULL DEFAULT 0,
+		message_id TEXT
 	);`,
 ];
 

@@ -60,6 +60,7 @@ class Model {
         if (typeof v === "bigint") return `${v}`;
         if (typeof v === "boolean") return v ? 1 : 0;
         if (v instanceof Date) return getParisDatetimeSQLiteSafe(v);
+        console.log(v, typeof v);
         throw new Error("Unreachable exception");
     }
 
@@ -122,14 +123,18 @@ class Model {
                     ? options.values
                     : [options.values]
             )
+                .filter((v) => this.isSafeDBValue(v))
                 // Typeguard (sqlite doesn't support boolean)
                 .map((v) => Model.sanitize(v));
 
             // Safeguard
-            if (keys.length !== values.length || keys.length === 0)
+            if (keys.length !== values.length || keys.length === 0) {
+                console.log(keys, keys.length);
+                console.log(values, values.length);
                 throw new Error(
                     "Couldn't build query, keys don't match values length.",
                 );
+            }
 
             // Set WHERE clause
             whereStr += "WHERE";
@@ -403,6 +408,31 @@ export class ChannelParam extends Model {
     public toString(): string {
         return `${this.command_name}(${this.command_param}): Channel <#${this.channel_id}> from Guild ${this.guild_id}`;
     }
+
+    public static _paramsCache = new Map<
+        [string, string, string],
+        ChannelParam
+    >();
+    public static getParam(
+        guildId: string,
+        commandName: string,
+        paramName: string,
+    ) {
+        const param = ChannelParam._paramsCache.get([
+            guildId,
+            commandName,
+            paramName,
+        ]);
+        if (param) return param;
+
+        const res = ChannelParam.get({
+            keys: ["guild_id", "command_name", "command_param"],
+            values: [guildId, commandName, paramName],
+        });
+        if (!res) return null;
+        ChannelParam._paramsCache.set([guildId, commandName, paramName], res);
+        return res;
+    }
 }
 
 export class Profession extends Model {
@@ -470,14 +500,18 @@ export class Command extends Model {
 }
 
 export class CommandItem extends Model {
+    public id!: number | bigint | string;
     public command_id!: number | bigint | string;
     public item_name!: string;
-    public quantity: number = 1;
+    public quantity!: number;
+    public progress!: number;
+    public message_id?: string | undefined;
 }
 
 export class CommandProfession extends Model {
     public command_id!: number | bigint | string;
     public profession_name!: string;
+    public filled!: boolean;
 }
 
 export class CommandAssignee extends Model {
