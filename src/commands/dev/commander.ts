@@ -1081,14 +1081,16 @@ async function advanceItemHandler(
     }
 
     const qtyRaw = interaction.fields.getField("quantity");
-    if (!qtyRaw.value.trim().match(/\d?[\d\s,_-]+\d?/)) {
+    if (!qtyRaw.value.trim().match(/^\d?[\d\s,_-]+\d?$/)) {
         interaction.editReply("Mauvais format! Nombre uniquement svp");
         return;
     }
 
     const quantity = Number(qtyRaw.value.replace(/\s_,-/g, ""));
     if (quantity <= 0) {
-        interaction.editReply("Merci de rentrer un nombre >= 0 !");
+        interaction.editReply(
+            "Merci de rentrer un nombre strictement positif (>0) !",
+        );
         return;
     }
 
