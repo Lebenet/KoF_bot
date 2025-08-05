@@ -2,11 +2,12 @@
 clear 2> /dev/null
 
 # Make sure scripts are runnable
-chmod +x ./scripts/tsc_stop.sh
+chmod +x ./scripts/tsc_stopper.sh
 chmod +x ./scripts/attach_logs.sh
+chmod +x ./scripts/start_tsc.sh
 
 # Try to kill older tsc process
-pkill -f "tsc --watch"
+pkill -f "start_tsc"
 
 # Clean dist
 rm -rf dist
@@ -20,7 +21,7 @@ if [ $? -ne 0 ]; then
     echo "❌ Initial TypeScript compilation failed. Exiting."
     exit 1
 fi
-setsid npx tsc --watch --preserveWatchOutput --incremental < /dev/null &
+setsid ./scripts/start_tsc.sh < /dev/null > tsc-watch.log 2>&1 &
 
 # Send .env file & bot data over
 cp -r .env src/data dist/
@@ -28,7 +29,7 @@ cp -r .env src/data dist/
 # If stopping the container: cleanup compiler
 CONTAINER_NAME="kof-bot"
 
-setsid ./scripts/tsc_stop.sh "$CONTAINER_NAME" < /dev/null &
+setsid ./scripts/tsc_stopper.sh "$CONTAINER_NAME" < /dev/null &
 
 # Start docker
 docker compose up --build -d

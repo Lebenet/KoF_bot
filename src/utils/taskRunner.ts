@@ -2,6 +2,8 @@ import { computeNextTimestamp, getParisDatetimeSQLiteSafe } from "./taskUtils";
 import { getTasks, deactivateTask } from "./taskLoader";
 import { getConfig } from "./configLoader";
 
+export const reloadDummyTaskRunner = "...";
+
 // "Global" Variables
 let intervalId: NodeJS.Timeout | null = null;
 

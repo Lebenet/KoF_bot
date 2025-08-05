@@ -114,7 +114,7 @@ module.exports = {
                         value: "Something went wrong, please ask an admin to reload this command.",
                     },
                 ],
-                thumbnail: getConfig().bot.user.avatarURL(),
+                thumbnail: getConfig().bot.user?.avatarURL() ?? undefined,
             },
             Colors.Yellow,
         ),

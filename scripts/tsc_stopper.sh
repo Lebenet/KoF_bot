@@ -15,12 +15,12 @@ while read -r event; do
 	echo "[$(date)] Container $CONTAINER_NAME stopped event received."
 
 	# wait a moment before checking
-	sleep 3
+	sleep 10
 
 	# Check if container is still running
 	if ! docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" | grep -q true; then
-		echo "[$(date)] Container $CONTAINER_NAME is not running anymore. Cleaning up..."
-		pkill -f "tsc --watch"
+		# echo "[$(date)] Container $CONTAINER_NAME is not running anymore. Cleaning up..."
+		pkill -f "start_tsc"
 		break
 	else
 		echo "[$(date)] Container $CONTAINER_NAME restarted, skipping cleanup."

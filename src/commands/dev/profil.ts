@@ -213,30 +213,31 @@ async function updateSkillsHandler(
     interaction: ButtonInteraction,
     config: Config,
 ) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferUpdate();
 
     const [, , , targetId, authorId] = interaction.customId.split("|");
-    const msg = interaction.message;
 
     const res = await updateSkills(targetId);
-
-    interaction.editReply(
-        res.success
-            ? (res.message ?? "Update réussie.")
-            : (res.error ?? "Quelque chose s'est mal passé."),
-    );
-    setTimeout(() => interaction.deleteReply(), 3_000);
 
     const embeds = [await getSkillsEmbed(targetId, config)];
     const components = getComponents(true, targetId, authorId);
 
-    msg.edit({
+    await interaction.editReply({
+        content: "edited2323",
         embeds: embeds,
         components: components,
     });
+
+    const flwp = await interaction.followUp({
+        content: res.success
+            ? (res.message ?? "Update réussie.")
+            : (res.error ?? "Quelque chose s'est mal passé."),
+        flags: MessageFlags.Ephemeral,
+    });
+    setTimeout(() => interaction.deleteReply(flwp).catch(), 3_000);
 }
 
-// MEssage put to ephemeral: no need anymore
+// Message put to ephemeral: no need anymore
 /*
 async function delHandler(interaction: ButtonInteraction, _config: Config) {
     const [, , , targetId, authorId] = interaction.customId.split("|");

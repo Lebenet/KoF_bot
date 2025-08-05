@@ -10,11 +10,16 @@ import {
     SlashCommandBuilder,
 } from "discord.js";
 import { Config } from "../db/dbTypes";
+import { __get_commands } from "./states";
 
-export type SubInteractionHandler = (...args: [Interaction, Config]) => void;
+export const reloadDummyConmmandLoader = "...";
+
+export type SubInteractionHandler = (
+    ...args: [Interaction, Config]
+) => Promise<void>;
 
 export type Command = {
-    execute: (...args: [ChatInputCommandInteraction, Config]) => void;
+    execute: (...args: [ChatInputCommandInteraction, Config]) => Promise<void>;
     data: SlashCommandBuilder;
     help?: () => EmbedBuilder;
 } & {
@@ -28,19 +33,8 @@ export type Commands = {
 };
 
 // Dynamically loaded commands
-const commands: Commands = {
-    public: new Map<string, Command>(),
-    dev: new Map<string, Command>(),
-    toString: () => {
-        let res = "Dev: {\n";
-        res += [...commands.dev.keys()].map((k) => "- " + k).join("\n");
-        res += "\n}\n";
-        res += "Public: {\n";
-        res += [...commands.public.keys()].map((k) => "- " + k).join("\n");
-        res += "\n}\n";
-        return res;
-    },
-};
+const commands = __get_commands();
+
 const publicDir = "./commands/public/";
 const devDir = "./commands/dev/";
 
@@ -51,9 +45,18 @@ export function unloadCommand(
 ) {
     // Delete command from require memory
     try {
-        delete require.cache[require.resolve(filePath)];
+        const modPath = require.resolve(filePath);
+        const oldMod = require.cache[modPath];
+
+        // Deep cleaning
+        oldMod?.children.forEach((dep) => {
+            if (!dep.path.toLowerCase().endsWith("watcher.js"))
+                delete require.cache[dep.id];
+        });
+
+        delete require.cache[modPath];
     } catch (err) {
-        console.log(err);
+        console.error("File did not need reloading", err);
         // just means didn't need reloading
     }
 
@@ -101,16 +104,21 @@ export function loadCommand(file: string, dir: string) {
         // TODO: implement reloading old behaviour
     }
 }
+
 export function initCmdLoad() {
     // Load public commands
     fs.readdirSync(publicDir)
-        .filter((file) => file.endsWith(".js"))
+        .filter((file) => file.endsWith(".js") && !file.includes("help"))
         .forEach((file) => loadCommand(file, publicDir));
 
     // Load dev commands
     fs.readdirSync(devDir)
-        .filter((file) => file.endsWith(".js"))
+        .filter((file) => file.endsWith(".js") && !file.includes("help"))
         .forEach((file) => loadCommand(file, devDir));
+
+    // Load helpers once
+    loadCommand("help.js", devDir);
+    loadCommand("help.js", publicDir);
 }
 
 export const getGuildCommands = (guildId: string) => {

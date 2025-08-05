@@ -99,11 +99,11 @@ module.exports = {
 			L'aide pour les tâches automatiques n'est pas encore supporté.*",
                 fields: [
                     {
-                        name: "Error",
+                        name: "Error 22",
                         value: "Something went wrong, please ask an admin to reload this command.",
                     },
                 ],
-                thumbnail: getConfig().bot.user.avatarURL(),
+                thumbnail: getConfig().bot.user?.avatarURL() ?? undefined,
             },
             Colors.Yellow,
         ),

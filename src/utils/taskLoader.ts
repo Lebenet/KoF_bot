@@ -35,21 +35,13 @@ import fs from "fs";
 import path from "path";
 import { computeNextTimestamp } from "./taskUtils";
 import { Config } from "../db/dbTypes";
+import { __get_tasks } from "./states";
+
+export const reloadDummyTaskLoader = "...";
 
 // Dynamically loaded tasks
-const tasks: Tasks = {
-    public: new Map<string, Task>(),
-    dev: new Map<string, Task>(),
-    toString: () => {
-        let res = "Dev: {\n";
-        res += [...tasks.dev.keys()].map((k) => "- " + k).join("\n");
-        res += "\n}\n";
-        res += "Public: {\n";
-        res += [...tasks.public.keys()].map((k) => "- " + k).join("\n");
-        res += "\n}\n";
-        return res;
-    },
-};
+const tasks = __get_tasks();
+
 const publicDir = "./tasks/public/";
 const devDir = "./tasks/dev/";
 
@@ -123,7 +115,16 @@ export function unloadTask(
 ) {
     // Delete task from require memory
     try {
-        delete require.cache[require.resolve(filePath)];
+        const modPath = require.resolve(filePath);
+        const oldMod = require.cache[modPath];
+
+        // Deep cleaning
+        oldMod?.children.forEach((dep) => {
+            if (!dep.path.toLowerCase().endsWith("watcher.js"))
+                delete require.cache[dep.id];
+        });
+
+        delete require.cache[modPath];
     } catch (err) {
         console.log(err);
         // just means didn't need reloading

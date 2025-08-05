@@ -236,7 +236,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         }
 
         try {
-            command[handlerName](interaction, config);
+            await command[handlerName](interaction, config);
         } catch (err) {
             console.error(`[EXECUTE] An error occured:\n`, err);
             await handleDeferredReply(
@@ -275,7 +275,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         }
 
         try {
-            command[handlerName](interaction, config);
+            await command[handlerName](interaction, config);
         } catch (err) {
             console.error(`[EXECUTE] An error occured:\n`, err);
             await handleDeferredReply(

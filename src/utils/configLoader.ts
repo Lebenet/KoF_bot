@@ -3,11 +3,13 @@ import path from "path";
 import { exit } from "process";
 import Database from "better-sqlite3";
 import { Client } from "discord.js";
+import { Config } from "../db/dbTypes";
+import { __get_config } from "./states";
+
+export const reloadDummyConfigLoader = "...";
 
 // Dynamic config holder
-const config: any = {
-    locked: false, // Bot lock during hot-reload (or other)
-};
+const config: Partial<Config> | Config = __get_config();
 
 export const lockBot = () => (config.locked = true);
 export const unlockBot = () => (config.locked = false);
@@ -40,7 +42,7 @@ export function deleteSingleConfig(fileName: string) {
         const key = fileName.replace(".json", "");
         delete config[key];
     } catch (err) {
-        console.log(
+        console.error(
             `[ERROR] | [CONFIG] Failed to remove config file from config:\n`,
             err,
         );
@@ -62,7 +64,7 @@ export function loadConfig(
     });
 }
 
-export const getConfig = () => config;
+export const getConfig = (): Config => config as Config;
 
 export const setDb = (db: Database.Database) => (config.db = db);
 

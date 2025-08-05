@@ -13,6 +13,8 @@ import { getGuildTasks } from "./taskLoader";
 import { getConfig } from "./configLoader";
 import { getParisDatetimeSQLiteSafe } from "./taskUtils";
 
+export const reloadDummyDiscordUtils = "...";
+
 export function getProfessionsStringSelectCommandArg(): {
     name: string;
     value: string;
@@ -197,9 +199,11 @@ export function xpToLevel(xp: number): number {
 }
 
 // Custom Embed Builder
-
 function globalEmbedFactory(embedType: EmbedType, color: number): EmbedBuilder {
-    const client: ClientUser = getConfig().bot.user;
+    const client: ClientUser | null = getConfig().bot.user;
+    if (!client)
+        return new EmbedBuilder().setTitle("Error").setColor(Colors.Red);
+
     const embed = new EmbedBuilder().setColor(color);
 
     if (embedType.title) {
@@ -297,6 +301,13 @@ export async function updateSkills(
         return { success: false, error: "Erreur de DB ! Veuillez réessayer." };
     }
 
+    const playerId = user.player_id;
+    if (!playerId)
+        return {
+            success: false,
+            error: "Cet utilisateur n'est pas link. Merci de lui faire faire `/link`.",
+        };
+
     const currTime = new Date(getParisDatetimeSQLiteSafe());
     // If user has already fetched skills recently
     if (
@@ -316,13 +327,6 @@ export async function updateSkills(
             error: "Erreur de DB en updatant vos informations ! Veuillez réessayer.",
         };
     }
-
-    const playerId = user.player_id;
-    if (!playerId)
-        return {
-            success: false,
-            error: "Cet utilisateur n'est pas link. Merci de faire `/link`.",
-        };
     // const playerName = user.player_username!;
 
     // custom types for typescript (and easier debug)
