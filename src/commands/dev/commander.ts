@@ -788,9 +788,58 @@ async function addItemsSend(interaction: ButtonInteraction, config: Config) {
 }
 
 function getPanelEmbed(command: Command): EmbedBuilder {
+    const items = CommandItem.fetchArray({
+        keys: "command_id",
+        values: command.id,
+    })
+        .toSorted(
+            (i1, i2) => i2.quantity - i2.progress - (i1.quantity - i1.progress),
+        )
+        .map((i) => {
+            const len = i.item_name.length;
+            const nameLim =
+                i.item_name.slice(0, Math.min(40, len)) +
+                (len > 50 ? "..." : "");
+            return i.progress >= i.quantity
+                ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}***~~`
+                : `- ${`**__${i.quantity - i.progress}__**`} [${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}**`;
+        });
+
+    const rows = new Array<{ name: string; value: string; inline: false }>();
+    let i = 0;
+    while (i < items.length && rows.length < 4) {
+        if (items.length - i >= 9) {
+            rows.push({
+                name: i === 0 ? "Items:" : "\u200e",
+                value: items.slice(i, i + 9).join("\n"),
+                inline: false,
+            });
+            i += 9;
+        } else {
+            rows.push({
+                name: i === 0 ? "Items:" : "\u200e",
+                value: items.slice(i, i + (items.length - i)).join("\n"),
+                inline: false,
+            });
+            i = items.length;
+        }
+    }
+    if (rows.length === 0)
+        rows.push({ name: "Items", value: "Pas précisé.", inline: false });
+
+    const descLen = command.description.length;
+    const desc =
+        descLen < 1000
+            ? command.description
+            : command.description.slice(0, 997) + "...";
+
+    const titleLen = command.c_name.length;
+    const title =
+        titleLen < 100 ? command.c_name : command.c_name.slice(0, 97) + "...";
+
     return new EmbedBuilder()
-        .setTitle(`${command.c_name}`)
-        .setDescription(command.description)
+        .setTitle(title)
+        .setDescription(desc)
         .setColor(Colors.DarkAqua)
         .setFooter({ text: "Dernière update:" })
         .setTimestamp()
@@ -811,30 +860,7 @@ function getPanelEmbed(command: Command): EmbedBuilder {
                         .map((p) => p.profession_name)
                         .join(", ") || "Pas précisé.",
             },
-            {
-                name: "Items",
-                value:
-                    CommandItem.fetchArray({
-                        keys: "command_id",
-                        values: command.id,
-                    })
-                        .toSorted(
-                            (i1, i2) =>
-                                i2.quantity -
-                                i2.progress -
-                                (i1.quantity - i1.progress),
-                        )
-                        .map((i) => {
-                            const len = i.item_name.length;
-                            const nameLim =
-                                i.item_name.slice(0, Math.min(50, len)) +
-                                (len > 50 ? "..." : "");
-                            return i.progress >= i.quantity
-                                ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}***~~`
-                                : `- ${`**__${i.quantity - i.progress}__**`} [${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}**`;
-                        })
-                        .join(",\n") || "Pas précisé.",
-            },
+            ...rows,
             {
                 name: "Assignés",
                 value: CommandAssignee.fetchArray({
