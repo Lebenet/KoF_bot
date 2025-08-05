@@ -48,12 +48,13 @@ async function order(
     interaction: ChatInputCommandInteraction,
     _config: Config,
 ) {
+    let tryCmd: Command | null;
     if (
-        Command.fetch({
+        (tryCmd = Command.get({
             keys: "author_id",
             values: interaction.user.id,
-            limit: 1,
-        })
+        })) &&
+        tryCmd.status !== "Ready"
     ) {
         await interaction.reply(
             "Tu as déjà une création de commande en cours (" +
@@ -135,11 +136,19 @@ async function initHandler(
     // What follows depends also on userId
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const chan = ChannelParam.fetch({
-        keys: ["guild_id", "command_name", "command_param"],
-        values: [interaction.guildId!, "commander", "commandes_channel_id"],
-        limit: 1,
-    }) as ChannelParam;
+    const chan = ChannelParam.getParam(
+        interaction.guildId!,
+        "commander",
+        "commandes_channel_id",
+    );
+    if (!chan) {
+        interaction.reply({
+            content:
+                "Le salon de commandes n'a pas été setup! Un admin doit faire `/setup_commandes` d'abord.",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
 
     const channel = config.bot.channels.cache.get(chan.channel_id) as
         | TextChannel
@@ -162,13 +171,21 @@ async function initHandler(
     const description: string =
         interaction.fields.getTextInputValue("description");
 
+    const titleLen = c_name.length;
+    const title = titleLen < 100 ? c_name : c_name.slice(0, 96) + "...";
+
+    const descLim =
+        description.length < 2000
+            ? description
+            : description.slice(0, 1996) + "...";
+
     // Order thread
     const thread = await channel.threads.create({
-        name: c_name,
+        name: title,
         autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
         reason: `Create thread for material order.`,
         message: {
-            content: `\u200e${description}`,
+            content: `\u200e${descLim}`,
         },
     });
 
@@ -236,14 +253,21 @@ async function initHandler(
             );
 
         // Order embed
+
+        const descLen = command.description.length;
+        const desc =
+            descLen < 1000
+                ? command.description
+                : command.description.slice(0, 996) + "...";
+
         const message = new EmbedBuilder()
             .setColor(Colors.Orange)
-            .setTitle(command.c_name)
+            .setTitle(title)
             .setAuthor({
                 name: interaction.user.displayName,
                 iconURL: interaction.user.avatarURL()!,
             })
-            .setDescription(command.description)
+            .setDescription(desc)
             .setFooter({
                 text: "WIP. Contact `lebenet` for requests.",
                 iconURL: config.bot.user!.avatarURL()!,
@@ -939,6 +963,17 @@ async function addItemsHandler(
         /^([\w\s_-]+?(?:\s+[tT]\d+)?)\s+[xX]\s*([\d _-]+)$/,
     ];
 
+    // Message collector to remove pins notification
+    const collector = thread.createMessageCollector({
+        time: 30_000,
+        filter: (m) => m.type === MessageType.ChannelPinnedMessage,
+    });
+    collector.on("collect", async (m) => {
+        try {
+            await m.delete();
+        } catch {}
+    });
+
     interaction.fields.fields.forEach(async (f) => {
         const val = f.value.trim();
         if (!val) return;
@@ -992,18 +1027,7 @@ async function addItemsHandler(
         if (!item.update()) {
             msg.delete();
             item.delete();
-            return;
-        }
-        const collector = thread.createMessageCollector({
-            time: 3_000,
-            filter: (m) => m.type === MessageType.ChannelPinnedMessage,
-        });
-        collector.on("collect", async (m) => {
-            try {
-                await m.delete();
-            } catch {}
-        });
-        msg.pin();
+        } else msg.pin();
     });
     if (command.panel_message_id) updatePanel(command, config);
     interaction.deleteReply();
