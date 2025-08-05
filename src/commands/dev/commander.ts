@@ -93,7 +93,8 @@ async function order(
                     .setCustomId("c_name")
                     .setLabel("Nom de la commande")
                     .setStyle(TextInputStyle.Short)
-                    .setRequired(true),
+                    .setRequired(true)
+                    .setMaxLength(255),
             ),
             new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
                 new TextInputBuilder()
@@ -101,7 +102,8 @@ async function order(
                     .setLabel("Coffre de dépot?")
                     .setPlaceholder("(optionel)")
                     .setStyle(TextInputStyle.Short)
-                    .setRequired(false),
+                    .setRequired(false)
+                    .setMaxLength(255),
             ),
             new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
                 new TextInputBuilder()
@@ -109,7 +111,8 @@ async function order(
                     .setLabel("Je fournis les matériaux?")
                     .setPlaceholder("(ne pas remplir si non)")
                     .setStyle(TextInputStyle.Short)
-                    .setRequired(false),
+                    .setRequired(false)
+                    .setMaxLength(10),
             ),
             new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
                 new TextInputBuilder()
@@ -117,7 +120,8 @@ async function order(
                     .setLabel("Courte description de la commande ")
                     .setPlaceholder("(optionel)")
                     .setStyle(TextInputStyle.Paragraph)
-                    .setRequired(false),
+                    .setRequired(false)
+                    .setMaxLength(3999),
             ),
         );
 
@@ -762,7 +766,7 @@ async function addItemsSend(interaction: ButtonInteraction, config: Config) {
     // Create modal
     const modal = new ModalBuilder()
         .setCustomId(`|commander|addItemsHandler|${command.id}`)
-        .setTitle("Format: <num> <item> ou <item> X<num>");
+        .setTitle("Format: <num> <item> ou        <item> X<num>");
 
     // Generate fields
     const components = Array.from({ length: 5 }, (_, i) => {
@@ -820,11 +824,15 @@ function getPanelEmbed(command: Command): EmbedBuilder {
                                 i2.progress -
                                 (i1.quantity - i1.progress),
                         )
-                        .map((i) =>
-                            i.progress >= i.quantity
-                                ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}]* - **${i.item_name}**~~`
-                                : `- \>${`**__${i.quantity - i.progress}__**`} *[${Math.min(i.progress, i.quantity)}/${i.quantity}]* - **${i.item_name}**`,
-                        )
+                        .map((i) => {
+                            const len = i.item_name.length;
+                            const nameLim =
+                                i.item_name.slice(0, Math.min(50, len)) +
+                                (len > 50 ? "..." : "");
+                            return i.progress >= i.quantity
+                                ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}***~~`
+                                : `- ${`**__${i.quantity - i.progress}__**`} [${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}**`;
+                        })
                         .join(",\n") || "Pas précisé.",
             },
             {
@@ -1081,12 +1089,12 @@ async function advanceItemHandler(
     }
 
     const qtyRaw = interaction.fields.getField("quantity");
-    if (!qtyRaw.value.trim().match(/^\d?[\d\s,_-]+\d?$/)) {
+    if (!qtyRaw.value.trim().match(/^(?=.*\d)[\d\s,_-]+$/)) {
         interaction.editReply("Mauvais format! Nombre uniquement svp");
         return;
     }
 
-    const quantity = Number(qtyRaw.value.replace(/\s_,-/g, ""));
+    const quantity = Number(qtyRaw.value.replace(/[\s_,-]+/g, ""));
     if (quantity <= 0) {
         interaction.editReply(
             "Merci de rentrer un nombre strictement positif (>0) !",
