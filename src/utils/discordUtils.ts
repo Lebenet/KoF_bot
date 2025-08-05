@@ -437,3 +437,32 @@ export function getKind(skill: string): SkillKind {
 
     return _kindSkillsMap.get(skill)!;
 }
+
+export function shortenText(text: string, size: number) {
+    if (text.length < size - 4) return text;
+    return text.slice(0, size - 4) + "...";
+}
+
+export function shortenTitle(text: string) {
+    return shortenText(text, 100);
+}
+
+export function shortenMessage(text: string) {
+    return shortenText(text, 2000);
+}
+
+export function shortenEmbedTitle(text: string) {
+    return shortenText(text, 255);
+}
+
+export function shortenEmbedDescription(text: string) {
+    return shortenText(text, 4000);
+}
+
+export function shortenEmbedFieldName(text: string) {
+    return shortenEmbedTitle(text);
+}
+
+export function shortenEmbedFieldValue(text: string) {
+    return shortenText(text, 1000);
+}

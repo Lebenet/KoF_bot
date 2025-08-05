@@ -42,7 +42,13 @@ import {
     Fournisseur,
 } from "../../db/dbTypes";
 
-import { getProfessionsStringSelectMessageComp } from "../../utils/discordUtils";
+import {
+    getProfessionsStringSelectMessageComp,
+    shortenEmbedFieldValue,
+    shortenMessage,
+    shortenText,
+    shortenTitle,
+} from "../../utils/discordUtils";
 
 async function order(
     interaction: ChatInputCommandInteraction,
@@ -171,13 +177,8 @@ async function initHandler(
     const description: string =
         interaction.fields.getTextInputValue("description");
 
-    const titleLen = c_name.length;
-    const title = titleLen < 100 ? c_name : c_name.slice(0, 96) + "...";
-
-    const descLim =
-        description.length < 2000
-            ? description
-            : description.slice(0, 1996) + "...";
+    const title = shortenTitle(c_name);
+    const descLim = shortenMessage(description);
 
     // Order thread
     const thread = await channel.threads.create({
@@ -254,11 +255,7 @@ async function initHandler(
 
         // Order embed
 
-        const descLen = command.description.length;
-        const desc =
-            descLen < 1000
-                ? command.description
-                : command.description.slice(0, 996) + "...";
+        const desc = shortenText(command.description, 1000);
 
         const message = new EmbedBuilder()
             .setColor(Colors.Orange)
@@ -820,10 +817,7 @@ function getPanelEmbed(command: Command): EmbedBuilder {
             (i1, i2) => i2.quantity - i2.progress - (i1.quantity - i1.progress),
         )
         .map((i) => {
-            const len = i.item_name.length;
-            const nameLim =
-                i.item_name.slice(0, Math.min(40, len)) +
-                (len > 50 ? "..." : "");
+            const nameLim = shortenText(i.item_name, 40);
             return i.progress >= i.quantity
                 ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}***~~`
                 : `- ${`**__${i.quantity - i.progress}__**`} [${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}**`;
@@ -851,15 +845,8 @@ function getPanelEmbed(command: Command): EmbedBuilder {
     if (rows.length === 0)
         rows.push({ name: "Items", value: "Pas précisé.", inline: false });
 
-    const descLen = command.description.length;
-    const desc =
-        descLen < 1000
-            ? command.description
-            : command.description.slice(0, 997) + "...";
-
-    const titleLen = command.c_name.length;
-    const title =
-        titleLen < 100 ? command.c_name : command.c_name.slice(0, 97) + "...";
+    const desc = shortenText(command.description, 1000);
+    const title = shortenTitle(command.c_name);
 
     return new EmbedBuilder()
         .setTitle(title)
@@ -1015,7 +1002,9 @@ async function addItemsHandler(
             .setStyle(ButtonStyle.Success);
 
         const msg = await thread.send({
-            content: `### 🔃 [0/${item.quantity}] - ${item.item_name}`,
+            content: shortenMessage(
+                `### 🔃 [0/${item.quantity}] - ${item.item_name}`,
+            ),
             components: [
                 new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
                     [advanceBut, completeBut],
