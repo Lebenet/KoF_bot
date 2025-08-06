@@ -63,11 +63,19 @@ function taskWatcherHandler(filePath: string, event: string) {
             console.log(`[WARN] Task Watcher: Unhandled event ${event}.`);
     }
 
-    console.log(getTasks().toString());
-
     console.log(
         `[WATCHER](Task) ${event}${event === "change" ? "" : "e"}d: ${filePath}`,
     );
+    const tmt = timeoutsMap.get("tasks");
+    if (tmt) tmt.refresh();
+    else
+        timeoutsMap.set(
+            "tasks",
+            setTimeout(() => {
+                console.log(getTasks().toString());
+                timeoutsMap.delete("tasks");
+            }, 1_000),
+        );
 }
 
 function commandWatcherHandler(filePath: string, event: string) {
@@ -104,7 +112,7 @@ function commandWatcherHandler(filePath: string, event: string) {
             setTimeout(() => {
                 loadCommand("help.js", folders.commands[dir]);
                 sendCommands(guildId);
-                console.log(getCommands().toString());
+                console.log(getCommands().toString(guildId));
                 timeoutsMap.delete(guildId);
             }, 1_000),
         );

@@ -23,7 +23,7 @@ export type Task = {
 export type Tasks = {
     public: Map<string, Task>;
     dev: Map<string, Task>;
-    toString: () => string;
+    toString: (guildId?: string) => string;
 };
 
 /*

@@ -29,7 +29,7 @@ export type Command = {
 export type Commands = {
     public: Map<string, Command>;
     dev: Map<string, Command>;
-    toString: () => string;
+    toString: (guildId?: string) => string;
 };
 
 // Dynamically loaded commands

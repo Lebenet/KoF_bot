@@ -20,7 +20,7 @@ type Command = {
 type Commands = {
     public: Map<string, Command>;
     dev: Map<string, Command>;
-    toString: () => string;
+    toString: (guildId?: string) => string;
 };
 
 type TaskDataLoad = {
@@ -48,7 +48,7 @@ type Task = {
 type Tasks = {
     public: Map<string, Task>;
     dev: Map<string, Task>;
-    toString: () => string;
+    toString: (guildId?: string) => string;
 };
 
 type Config = {
@@ -69,13 +69,18 @@ if (!globalThis.__commands)
     globalThis.__commands = {
         public: new Map<string, Command>(),
         dev: new Map<string, Command>(),
-        toString: function () {
-            let res = "Dev: {\n";
-            res += [...this.dev.keys()].map((k) => "- " + k).join("\n");
-            res += "\n}\n";
-            res += "Public: {\n";
-            res += [...this.public.keys()].map((k) => "- " + k).join("\n");
-            res += "\n}\n";
+        toString: function (guildId?: string) {
+            let res = "";
+            if (!guildId || guildId === process.env.DEV_GUILD_ID) {
+                res += "Dev: {\n";
+                res += [...this.dev.keys()].map((k) => "- " + k).join("\n");
+                res += "\n}\n";
+            }
+            if (!guildId || guildId === process.env.GUILD_ID) {
+                res += "Public: {\n";
+                res += [...this.public.keys()].map((k) => "- " + k).join("\n");
+                res += "\n}\n";
+            }
             return res;
         },
     };
@@ -86,13 +91,18 @@ if (!globalThis.__tasks)
     globalThis.__tasks = {
         public: new Map<string, Task>(),
         dev: new Map<string, Task>(),
-        toString: function () {
-            let res = "Dev: {\n";
-            res += [...this.dev.keys()].map((k) => "- " + k).join("\n");
-            res += "\n}\n";
-            res += "Public: {\n";
-            res += [...this.public.keys()].map((k) => "- " + k).join("\n");
-            res += "\n}\n";
+        toString: function (guildId?: string) {
+            let res = "";
+            if (!guildId || guildId === process.env.DEV_GUILD_ID) {
+                res += "Dev: {\n";
+                res += [...this.dev.keys()].map((k) => "- " + k).join("\n");
+                res += "\n}\n";
+            }
+            if (!guildId || guildId === process.env.GUILD_ID) {
+                res += "Public: {\n";
+                res += [...this.public.keys()].map((k) => "- " + k).join("\n");
+                res += "\n}\n";
+            }
             return res;
         },
     };
