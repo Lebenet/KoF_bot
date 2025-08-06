@@ -14,7 +14,7 @@ while true; do
 
 	if [ "$status" = "running" ]; then
 		echo "Container (re)started, attaching to new logs..."
-		docker logs --since 2s -f "$CONTAINER_NAME"
+		docker logs --since 5s -f "$CONTAINER_NAME"
 		
 		code=$?
 		if [ "$code" -eq 1 ] || [ "$code" -eq 130 ]; then
@@ -22,7 +22,7 @@ while true; do
 			break
 		else
 			echo "Container stop."
-			sleep 1
+			sleep 3
 		fi
 	else
 		sleep 2

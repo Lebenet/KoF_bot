@@ -11,7 +11,7 @@ docker events \
   --filter "container=$CONTAINER_NAME" \
   --since 1s |
 while read -r event; do
-  echo ""
+  	echo ""
 	echo "[$(date)] Container $CONTAINER_NAME stopped event received."
 
 	# wait a moment before checking
