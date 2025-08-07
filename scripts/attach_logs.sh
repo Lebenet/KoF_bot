@@ -12,7 +12,7 @@ while true; do
 	status=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
 	echo $status
 
-	if [ "$status" = "running" ]; then
+	if [ "$status" = "running" ] || [ "$status" = "restarting" ]; then
 		echo "Container (re)started, attaching to new logs..."
 		docker logs --since 5s -f "$CONTAINER_NAME"
 		

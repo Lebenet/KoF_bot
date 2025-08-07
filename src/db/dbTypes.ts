@@ -5,20 +5,20 @@ import { db } from "./dbConn";
 import Database from "better-sqlite3";
 import { getParisDatetimeSQLiteSafe } from "../utils/taskUtils";
 import { getEmoji } from "../utils/discordUtils";
+import { sendCommands } from "../utils/commandLoader";
+
+export const relaodDummyDbTypes = "...";
+
+export type DbOptionsValue = number | bigint | string | boolean | Date | null;
 
 export type DbOptions = {
     keys?: string[] | string | null;
-    values?:
-        | (number | bigint | string | boolean | Date)[]
-        | number
-        | bigint
-        | string
-        | boolean
-        | Date
-        | null;
+    values?: DbOptionsValue[] | DbOptionsValue | null;
+
     table?: string | null;
     limit?: number | bigint | string | null;
     array?: boolean | null;
+    noNull?: boolean | null;
 };
 
 export type FieldType = "string" | "bigint" | "number" | "boolean" | "Date";
@@ -46,8 +46,12 @@ export class Model {
     private static _primaryKeysCache: Map<string, string[]> = new Map();
 
     private static isSafeDBValue(v: any): boolean {
+        const tv = typeof v;
         return (
-            ["number", "bigint", "string", "boolean"].includes(typeof v) ||
+            tv === "number" ||
+            tv === "bigint" ||
+            tv === "string" ||
+            tv === "boolean" ||
             v instanceof Date
         );
     }
@@ -62,6 +66,40 @@ export class Model {
         if (v instanceof Date) return getParisDatetimeSQLiteSafe(v);
         console.log(v, typeof v);
         throw new Error("Unreachable exception");
+    }
+
+    private static buildWhereClause(
+        keys?: null | string | string[],
+        values?: null | DbOptionsValue | DbOptionsValue[],
+        noNull?: boolean | null,
+    ): { whereClause: string; values: (string | number | bigint)[] } {
+        if (!keys || !values) return { whereClause: "", values: [] };
+        if (!Array.isArray(keys)) keys = [keys];
+        if (!Array.isArray(values)) values = [values];
+
+        const retVals: (string | number | bigint)[] = [];
+        let str = "WHERE ";
+
+        str += keys
+            .map((k, i) => {
+                const v = values[i];
+                if (Model.isSafeDBValue(v)) {
+                    retVals.push(Model.sanitize(v!));
+                    return `${k} = ?`;
+                } else if (v === null) {
+                    if (noNull)
+                        throw new Error(
+                            `[DB] Build where clause: null value for ${k} not authorised in this query.`,
+                        );
+                    return `${k} IS NULL`;
+                } else
+                    throw new Error(
+                        `[DB] Build where clause: unsafe value for key ${k} (${v})`,
+                    );
+            })
+            .join(" AND ");
+
+        return { whereClause: str, values: retVals };
     }
 
     public static getPrimaryKeys(table: string): string[] {
@@ -97,6 +135,8 @@ export class Model {
                 case "Date":
                     this[key] = v ? new Date(v) : v;
                     break;
+                default:
+                    this[key] = v;
             }
         }
     }
@@ -111,47 +151,14 @@ export class Model {
         const limit = options && options.limit ? `LIMIT ${options.limit}` : "";
 
         // Build WHERE clause
-        let whereStr: string = "";
-        let values: unknown[] = [];
-        if (options && options.keys && options.values) {
-            // Normalize WHERE parameters input
-            const keys = Array.isArray(options.keys)
-                ? options.keys
-                : [options.keys];
-            values = (
-                Array.isArray(options.values)
-                    ? options.values
-                    : [options.values]
-            )
-                .filter((v) => this.isSafeDBValue(v))
-                // Typeguard (sqlite doesn't support boolean)
-                .map((v) => Model.sanitize(v));
+        const { whereClause, values } = Model.buildWhereClause(
+            options?.keys,
+            options?.values,
+            options?.noNull,
+        );
+        const sql = `SELECT * FROM ${table} ${whereClause} ${limit}`;
 
-            // Safeguard
-            if (keys.length !== values.length || keys.length === 0) {
-                console.log(keys, keys.length);
-                console.log(values, values.length);
-                throw new Error(
-                    "Couldn't build query, keys don't match values length.",
-                );
-            }
-
-            // Set WHERE clause
-            whereStr += "WHERE";
-            whereStr += keys.map((k: string) => ` ${k} = ?`).join(" AND");
-        }
-
-        /*
-		console.log("==============");
-		console.log(this);
-		console.log(values);
-		values.forEach((v) => console.log(v, typeof v));
-		console.log("==============");
-		*/
-
-        return db
-            .prepare(`SELECT * FROM ${table} ${whereStr} ${limit}`)
-            .all(...values);
+        return db.prepare(sql).all(...values);
     }
 
     // Get one or all of type from database that match a where clause
@@ -211,6 +218,7 @@ export class Model {
                 values: values,
                 table: table,
                 limit: 1,
+                noNull: true,
             });
 
             if (row && row.length > 0) {
@@ -253,12 +261,16 @@ export class Model {
 
         // Non-primary keys values (SET clause)
         const values: any[] = [];
+        let nc = 0;
         rawUks.forEach((k: string): void => {
             const v: any = this[k];
             if (Model.isSafeDBValue(v)) {
                 uks.push(k);
-                // Convert booleans to 0 or 1 (no native support)
+                // Convert booleans & date (no native support)
                 values.push(Model.sanitize(v));
+            } else if (v === null) {
+                uks.push(k);
+                nc++;
             }
         });
 
@@ -266,14 +278,16 @@ export class Model {
         if (
             pks.length != pkValues.length ||
             pks.length === 0 ||
-            uks.length != values.length ||
+            uks.length != values.length + nc || // To allow for NULL updates
             uks.length == 0
         )
             return false;
 
         // Build SET clause
         const setClause: string = uks
-            .map((k: string): string => `${k} = ?`)
+            .map((k: string): string =>
+                this[k] === null ? `${k} = NULL` : `${k} = ?`,
+            )
             .join(", ");
 
         // Build WHERE clause
@@ -282,6 +296,7 @@ export class Model {
             .join(" AND ");
 
         const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
+
         try {
             const res: Database.RunResult = db
                 .prepare(sql)
@@ -370,6 +385,37 @@ export class Model {
             return false;
         }
     }
+
+    // Check if an instance exists in the database
+    public exists(): boolean {
+        const fields = Object.keys(this).filter(
+            (k: string): boolean =>
+                typeof this[k] !== "function" &&
+                !k.startsWith("_") &&
+                !["table", "name", "ctor"].includes(k) &&
+                this[k] !== undefined &&
+                (Model.isSafeDBValue(this[k]) || this[k] === null),
+        );
+
+        if (fields.length === 0) return false;
+
+        const values = fields
+            .filter((k) => this[k] !== null)
+            .map((k) => Model.sanitize(this[k]));
+
+        const whereClause = fields
+            .map((k) => (this[k] === null ? `${k} IS NULL` : `${k} = ?`))
+            .join(" AND ");
+        const sql = `SELECT 1 FROM ${this.table} WHERE ${whereClause} LIMIT 1`;
+
+        try {
+            const row = db.prepare(sql).get(...values);
+            return !!row;
+        } catch (err) {
+            console.error(`[DB] Exists check failed:\n`, err);
+            return false;
+        }
+    }
 }
 
 export class User extends Model {
@@ -399,38 +445,133 @@ export class User extends Model {
     };
 }
 
+type _cpCacheKeysType = (number | bigint | string | null)[];
 export class ChannelParam extends Model {
+    public id!: number;
     public channel_id!: string;
     public guild_id!: string;
+    public settlement_id?: number | bigint | string | null;
     public command_name!: string;
     public command_param!: string;
 
     public toString(): string {
-        return `${this.command_name}(${this.command_param}): Channel <#${this.channel_id}> from Guild ${this.guild_id}`;
+        return (
+            `${this.command_name}(${this.command_param}): Channel <#${this.channel_id}> from Guild ${this.guild_id}` +
+            (this.settlement_id ? `(claim id ${this.settlement_id})` : "")
+        );
     }
 
     public static _paramsCache = new Map<
-        [string, string, string],
-        ChannelParam
+        _cpCacheKeysType,
+        { param: ChannelParam; lastEdited: number }
     >();
+
     public static getParam(
         guildId: string,
         commandName: string,
         paramName: string,
-    ) {
-        const param = ChannelParam._paramsCache.get([
+        settlementId?: number | bigint | string | null,
+    ): ChannelParam | null {
+        // settlementId safety
+        settlementId ??= null;
+
+        // Check cache
+        const res = ChannelParam._paramsCache.get([
             guildId,
             commandName,
             paramName,
+            settlementId,
         ]);
-        if (param) return param;
 
-        const res = ChannelParam.get({
-            keys: ["guild_id", "command_name", "command_param"],
-            values: [guildId, commandName, paramName],
+        // If in cache
+        if (res) {
+            const { param, lastEdited } = res;
+            // If has been fetched already in the last minute
+            if (lastEdited + 60 * 1_000 >= Date.now()) return param;
+        }
+
+        // If has not been fetched recently/at all
+
+        // Set Where clause
+        const keys = [
+            "guild_id",
+            "command_name",
+            "command_param",
+            "settlement_id",
+        ];
+        const values: _cpCacheKeysType = [
+            guildId,
+            commandName,
+            paramName,
+            settlementId,
+        ];
+
+        // Get res
+        const resQ = ChannelParam.get({
+            keys: keys,
+            values: values,
         });
-        if (!res) return null;
-        ChannelParam._paramsCache.set([guildId, commandName, paramName], res);
+
+        if (!settlementId) values.push(null);
+
+        // Check that it exists
+        if (!resQ) {
+            if (ChannelParam._paramsCache.has(values))
+                ChannelParam._paramsCache.delete(values);
+            return null;
+        }
+        ChannelParam._paramsCache.set(values, {
+            param: resQ,
+            lastEdited: Date.now(),
+        });
+        return resQ;
+    }
+
+    public override insert(): this | undefined {
+        const res = super.insert();
+        if (res && this.guild_id && this.command_name && this.command_param) {
+            const keys: _cpCacheKeysType = [
+                this.guild_id,
+                this.command_name,
+                this.command_param,
+                this.settlement_id ?? null,
+            ];
+            ChannelParam._paramsCache.set(keys, {
+                param: this,
+                lastEdited: Date.now(),
+            });
+        }
+        return res;
+    }
+
+    public override update(): boolean {
+        const res = super.update();
+        if (res && this.guild_id && this.command_name && this.command_param) {
+            const keys: _cpCacheKeysType = [
+                this.guild_id,
+                this.command_name,
+                this.command_param,
+                this.settlement_id ?? null,
+            ];
+            ChannelParam._paramsCache.set(keys, {
+                param: this,
+                lastEdited: Date.now(),
+            });
+        }
+        return res;
+    }
+
+    public override delete(): boolean {
+        const res = super.delete();
+        if (res && this.guild_id && this.command_name && this.command_param) {
+            const keys: _cpCacheKeysType = [
+                this.guild_id,
+                this.command_name,
+                this.command_param,
+                this.settlement_id ?? null,
+            ];
+            ChannelParam._paramsCache.delete(keys);
+        }
         return res;
     }
 }
@@ -449,12 +590,22 @@ export class Profession extends Model {
 export class Fournisseur extends Model {
     public user_id!: string;
     public guild_id!: string;
+    public settlement_id?: number | bigint | string | null;
     public coordinator!: boolean;
     public profession_name!: string;
 
     override fieldTypes: Record<string, FieldType> = {
         coordinator: "boolean",
     };
+
+    public toString(discord?: boolean): string {
+        const setl = this.settlement_id
+            ? Settlement.get({ keys: "id", values: this.settlement_id })
+            : null;
+        return discord
+            ? `- **${this.coordinator ? "🔧 Coordinateur" : "Fournisseur"}** de __${this.profession_name}__ ${this.settlement_id ? `*(${setl?.s_name})*` : ""}`
+            : `${this.coordinator ? "🔧 Coordinateur" : "Fournisseur"} de ${this.profession_name} ${this.settlement_id ? `(${setl?.s_name})` : ""}`;
+    }
 }
 
 export class Skill extends Model {
@@ -482,6 +633,7 @@ export class Skill extends Model {
 export class Command extends Model {
     public id!: number | bigint | string;
     public guild_id!: string;
+    public settlement_id?: number | bigint | string | null;
     public thread_id!: string;
     public message_id?: string | undefined;
     public panel_message_id?: string | undefined;
@@ -517,6 +669,38 @@ export class CommandProfession extends Model {
 export class CommandAssignee extends Model {
     public command_id!: number | bigint | string;
     public user_id!: string;
+}
+
+export class Settlement extends Model {
+    public id!: number | bigint | string;
+    public guild_id!: string;
+    public s_name!: string;
+    public owner_id!: string | null;
+    public member_count!: number;
+
+    public override insert(): this | undefined {
+        const res = super.insert();
+        if (res) sendCommands(this.guild_id).catch(console.log);
+        return res;
+    }
+
+    public override update(): boolean {
+        const res = super.update();
+        if (res) sendCommands(this.guild_id).catch(console.log);
+        return res;
+    }
+
+    public override delete(): boolean {
+        const res = super.delete();
+        if (res) sendCommands(this.guild_id).catch(console.log);
+        return res;
+    }
+}
+
+export class SettlementMember extends Model {
+    public settlement_id!: number | bigint | string | null;
+    public user_id!: string;
+    public perm_level!: number;
 }
 
 export type Config = {

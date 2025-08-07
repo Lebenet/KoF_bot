@@ -4,7 +4,7 @@ import {
     MessageFlags,
     PermissionFlagsBits,
 } from "discord.js";
-import { ChannelParam } from "../../db/dbTypes";
+import { ChannelParam, Settlement } from "../../db/dbTypes";
 
 export async function setupChannelParam(
     interaction: ChatInputCommandInteraction,
@@ -19,6 +19,7 @@ export async function setupChannelParam(
     }
 
     await interaction.deferReply();
+
     const channelId: string =
         interaction.options.getString("channel_id") ?? interaction.channelId;
     if (!interaction.guild?.id && !interaction.guildId)
@@ -27,16 +28,27 @@ export async function setupChannelParam(
         interaction.guildId) as string;
     const commandName: string = interaction.options.getString(
         "command_name",
-    ) as string;
+        true,
+    );
     const commandParam: string = interaction.options.getString(
         "param_name",
-    ) as string;
+        true,
+    );
+
+    const claimId = interaction.options.getString("claim");
+    let setl: Settlement | null = null;
+    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (!setl && claimId) {
+        await interaction.editReply("Claim pas trouvé !");
+        return;
+    }
 
     const param: ChannelParam = new ChannelParam();
     param.channel_id = channelId;
     param.guild_id = guildId;
     param.command_name = commandName;
     param.command_param = commandParam;
+    param.settlement_id = setl?.id ?? null;
     if (param.insert())
         await interaction.editReply(
             `Succesfully added param ${commandParam} for command ${commandName} as ${channelId}.`,
@@ -67,6 +79,14 @@ module.exports = {
                 .setName("channel_id")
                 .setDescription(
                     "Id du salon (Par défault là où tu executes la commande)",
+                )
+                .setRequired(false),
+        )
+        .addStringOption((option) =>
+            option
+                .setName("claim")
+                .setDescription(
+                    "Name of the claim you wanna see channel params of",
                 )
                 .setRequired(false),
         )

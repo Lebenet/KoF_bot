@@ -40,10 +40,13 @@ import {
     Config,
     User,
     Fournisseur,
+    Settlement,
 } from "../../db/dbTypes";
 
 import {
+    dirName,
     getProfessionsStringSelectMessageComp,
+    getSettlementsHelper,
     shortenEmbedFieldValue,
     shortenMessage,
     shortenText,
@@ -70,19 +73,33 @@ async function order(
         return;
     }
 
-    const guildId = interaction.guildId ?? "0";
+    const guildId = interaction.guild?.id ?? interaction.guildId ?? "0";
 
-    const chan = new ChannelParam();
-    chan.command_param = "commandes_channel_id";
-    chan.command_name = "commander";
-    chan.guild_id = guildId;
+    const claimId = interaction.options.getString("claim");
+    let setl: Settlement | null = null;
+    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (!setl && claimId) {
+        await interaction.reply({
+            content: "Claim pas trouvé !",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
 
-    const panel = new ChannelParam();
-    panel.command_param = "panel_channel_id";
-    panel.command_name = "commander";
-    panel.guild_id = guildId;
+    const chan = ChannelParam.getParam(
+        guildId,
+        "commander",
+        "commandes_channel_id",
+        setl?.id ?? null,
+    );
+    const panel = ChannelParam.getParam(
+        guildId,
+        "commander",
+        "panel_channel_id",
+        setl?.id ?? null,
+    );
 
-    if (!chan.sync() || !panel.sync()) {
+    if (!chan || !panel) {
         await interaction.reply({
             content:
                 "Cette commande n'a pas encore été __setup__. Merci de d'abord faire `/setup_commandes`.",
@@ -92,7 +109,7 @@ async function order(
     }
 
     const initModal = new ModalBuilder()
-        .setCustomId(`${guildId}|commander|initHandler`)
+        .setCustomId(`${guildId}|commander|initHandler|${setl?.id ?? -1}`)
         .setTitle("Détails de la commande")
         .addComponents(
             new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
@@ -142,10 +159,14 @@ async function initHandler(
     // What follows depends also on userId
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
+    const guildId = interaction.customId.split("|")[0];
+    const setlId = Number(interaction.customId.split("|")[3]);
+
     const chan = ChannelParam.getParam(
-        interaction.guildId!,
+        guildId,
         "commander",
         "commandes_channel_id",
+        setlId > 0 ? setlId : undefined,
     );
     if (!chan) {
         interaction.reply({
@@ -196,6 +217,7 @@ async function initHandler(
     command.c_name = c_name;
     if (chest) command.chest = chest;
     if (description) command.description = description;
+    if (setlId !== -1) command.settlement_id = setlId;
     command.self_supplied = self_supplied;
     command.author_id = interaction.user.id;
 
@@ -284,8 +306,8 @@ async function initHandler(
                 // Empty line
                 { name: "\u200e", value: "\u200e" },
                 {
-                    name: "Informations",
-                    value: "Merci de sélectionner les professions correspondant à votre commande, afin de simplifier le travail des coordinateurs.",
+                    name: "**Informations**",
+                    value: "**Merci de sélectionner les professions correspondant à votre commande, afin de simplifier le travail des coordinateurs.**",
                 },
             );
 
@@ -309,7 +331,7 @@ async function initHandler(
         await interaction.editReply(
             `Votre commande peut être __complétée__ dans **<#${thread.id}>** !`,
         );
-        setTimeout(() => interaction.deleteReply(), 15000);
+        setTimeout(() => interaction.deleteReply(), 15_000);
     }
 }
 
@@ -355,7 +377,7 @@ async function manageProfessionsHandler(
     const msg = interaction.message;
     const embed = new EmbedBuilder(msg.embeds[0] as APIEmbed).setFields(
         msg.embeds[0].fields.map((f) =>
-            f.name !== "Informations"
+            !f.name.toLowerCase().includes("informations")
                 ? f
                 : {
                       name: "Professions:",
@@ -421,11 +443,13 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
-    const panel = new ChannelParam();
-    panel.command_param = "panel_channel_id";
-    panel.command_name = "commander";
-    panel.guild_id = interaction.guildId!;
-    panel.sync();
+    const panel = ChannelParam.getParam(
+        interaction.guildId ?? "0",
+        "commander",
+        "panel_channel_id",
+        command.settlement_id,
+    );
+    if (!panel) throw new Error("Something went wrong.");
 
     const panelMessage = (
         config.bot.channels.cache.get(panel.channel_id) as TextChannel
@@ -515,11 +539,13 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     const msgRow2 = msg.components[1];
 
     // Get panel to send message to
-    const ppanel = new ChannelParam();
-    ppanel.command_param = "panel_channel_id";
-    ppanel.command_name = "commander";
-    ppanel.guild_id = interaction.guildId!;
-    ppanel.sync();
+    const ppanel = ChannelParam.getParam(
+        interaction.guildId ?? "0",
+        "commander",
+        "panel_channel_id",
+        command.settlement_id,
+    );
+    if (!ppanel) throw new Error("Something went wrong.");
 
     const panel = config.bot.channels.cache.get(ppanel.channel_id) as
         | TextChannel
@@ -591,14 +617,15 @@ async function assignHandler(
         return;
     }
 
-    // TODO: Only let coordinators of the right professions assign people
-    // TODO: only propose knows providers of the right professions instead of anyone
-    //   - Change interaction from UserSelectMenu to StringSelectMenu with the usernames of the providers
+    // MAYBE: Only let coordinators of the right professions assign people
+    // MAYBE: only propose known providers of the right professions instead of anyone
+    // MAYBE: Change interaction from UserSelectMenu to StringSelectMenu with the usernames of the providers
 
     const chan = ChannelParam.getParam(
         interaction.guildId!,
         "commander",
         "commandes_channel_id",
+        command.settlement_id,
     );
     if (!chan) {
         await interaction.editReply(
@@ -607,12 +634,22 @@ async function assignHandler(
         return;
     }
 
-    // FIXME: also search with provided commannd professions
+    // MAYBE: also search with provided commannd professions
+    const keys = ["user_id", "guild_id", "coordinator"];
+    const values: (number | string | bigint | boolean)[] = [
+        interaction.user.id,
+        interaction.guildId!,
+        true,
+    ];
+    if (command.settlement_id) {
+        keys.push("settlement_id");
+        values.push(command.settlement_id);
+    }
     if (
         !config.admins?.includes(interaction.user.id) &&
-        !Fournisseur.fetch({
-            keys: ["user_id", "guild_id", "coordinator"],
-            values: [interaction.user.id, interaction.guildId!, true],
+        !Fournisseur.get({
+            keys: keys,
+            values: values,
         })
     ) {
         interaction.editReply(
@@ -698,6 +735,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             interaction.guildId!,
             "commander",
             "panel_channel_id",
+            command.settlement_id,
         );
         if (!panel) {
             await interaction.editReply(
@@ -714,6 +752,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             interaction.guildId!,
             "commander",
             "commandes_channel_id",
+            command.settlement_id,
         );
         if (!chan) {
             await interaction.editReply(
@@ -786,7 +825,9 @@ async function addItemsSend(interaction: ButtonInteraction, config: Config) {
 
     // Create modal
     const modal = new ModalBuilder()
-        .setCustomId(`|commander|addItemsHandler|${command.id}`)
+        .setCustomId(
+            `${interaction.guildId}|commander|addItemsHandler|${command.id}`,
+        )
         .setTitle("Format: <num> <item> ou        <item> X<num>");
 
     // Generate fields
@@ -848,40 +889,55 @@ function getPanelEmbed(command: Command): EmbedBuilder {
     const desc = shortenText(command.description, 1000);
     const title = shortenTitle(command.c_name);
 
-    return new EmbedBuilder()
+    const ret = new EmbedBuilder()
         .setTitle(title)
         .setDescription(desc)
         .setColor(Colors.DarkAqua)
         .setFooter({ text: "Dernière update:" })
-        .setTimestamp()
-        .setFields([
-            { name: "Coffre de dépôt:", value: command.chest, inline: true },
+        .setTimestamp();
+
+    if (command.settlement_id) {
+        const setl = new Settlement();
+        setl.id = command.settlement_id;
+        ret.addFields([
             {
-                name: "Matériaux fournis:",
-                value: command.self_supplied ? "Oui." : "Non.",
-                inline: true,
+                name: "Claim",
+                value: setl.sync() ? setl.s_name : "Erreur",
+                inline: false,
             },
-            {
-                name: "Professions:",
-                value:
-                    CommandProfession.fetchArray({
-                        keys: "command_id",
-                        values: command.id,
-                    })
-                        .map((p) => p.profession_name)
-                        .join(", ") || "Pas précisé.",
-            },
-            ...rows,
-            {
-                name: "Assignés",
-                value: CommandAssignee.fetchArray({
+        ]);
+    }
+
+    ret.addFields([
+        { name: "Coffre de dépôt:", value: command.chest, inline: true },
+        {
+            name: "Matériaux fournis:",
+            value: command.self_supplied ? "Oui." : "Non.",
+            inline: true,
+        },
+        {
+            name: "Professions:",
+            value:
+                CommandProfession.fetchArray({
                     keys: "command_id",
                     values: command.id,
                 })
-                    .map((a) => `<@${a.user_id}>`)
-                    .join(", "),
-            },
-        ]);
+                    .map((p) => p.profession_name)
+                    .join(", ") || "Pas précisé.",
+        },
+        ...rows,
+        {
+            name: "Assignés",
+            value: CommandAssignee.fetchArray({
+                keys: "command_id",
+                values: command.id,
+            })
+                .map((a) => `<@${a.user_id}>`)
+                .join(", "),
+        },
+    ]);
+
+    return ret;
 }
 
 async function updatePanel(command: Command, config: Config) {
@@ -889,6 +945,7 @@ async function updatePanel(command: Command, config: Config) {
         command.guild_id,
         "commander",
         "panel_channel_id",
+        command.settlement_id,
     );
     const panel = config.bot.channels.cache.get(panelParam?.channel_id!) as
         | TextChannel
@@ -928,6 +985,7 @@ async function addItemsHandler(
         interaction.guildId!,
         "commander",
         "commandes_channel_id",
+        command.settlement_id,
     );
     if (!channel) {
         interaction.editReply("Salon de commandes a été retiré de la config!");
@@ -1033,6 +1091,7 @@ function updateItem(
             command.guild_id,
             "commander",
             "commandes_channel_id",
+            command.settlement_id,
         );
         if (!param) return;
         const threadSrc = config.bot.channels.cache.get(param.channel_id) as
@@ -1093,7 +1152,9 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
     }
 
     const modal = new ModalBuilder()
-        .setCustomId(`|commander|advanceItemHandler|${command.id}|${item.id}`)
+        .setCustomId(
+            `${interaction.guildId}|commander|advanceItemHandler|${command.id}|${item.id}`,
+        )
         .setTitle("Combien ?")
         .addComponents([
             new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
@@ -1196,9 +1257,19 @@ async function completeItemHandler(
 }
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName("commander")
-        .setDescription("Créer une commande de matériaux."),
+    data: () =>
+        new SlashCommandBuilder()
+            .setName("commander")
+            .setDescription("Créer une commande de matériaux.")
+            .addStringOption((option) =>
+                option
+                    .setName("claim")
+                    .setDescription(
+                        "Claim dans lequel tu souhaites faire une commande",
+                    )
+                    .setRequired(false)
+                    .addChoices(getSettlementsHelper(__dirname, true)),
+            ),
 
     execute: order,
     initHandler: initHandler,

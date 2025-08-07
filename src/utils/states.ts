@@ -5,13 +5,14 @@ import {
     SlashCommandBuilder,
     EmbedBuilder,
     Client,
+    SharedSlashCommand,
 } from "discord.js";
 
 type SubInteractionHandler = (...args: [Interaction, Config]) => Promise<void>;
 
 type Command = {
     execute: (...args: [ChatInputCommandInteraction, Config]) => Promise<void>;
-    data: SlashCommandBuilder;
+    data: SlashCommandBuilder | (() => SlashCommandBuilder);
     help?: () => EmbedBuilder;
 } & {
     [key: string]: SubInteractionHandler | any;

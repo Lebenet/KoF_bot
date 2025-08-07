@@ -12,7 +12,7 @@ import {
 import { Config } from "../db/dbTypes";
 import { __get_commands } from "./states";
 
-export const reloadDummyConmmandLoader = "...";
+export const reloadDummyConmmandLoader = "..s.";
 
 export type SubInteractionHandler = (
     ...args: [Interaction, Config]
@@ -20,7 +20,7 @@ export type SubInteractionHandler = (
 
 export type Command = {
     execute: (...args: [ChatInputCommandInteraction, Config]) => Promise<void>;
-    data: SlashCommandBuilder;
+    data: SlashCommandBuilder | (() => SlashCommandBuilder);
     help?: () => EmbedBuilder;
 } & {
     [key: string]: SubInteractionHandler | any;
@@ -90,7 +90,11 @@ export function loadCommand(file: string, dir: string) {
 
         if ("data" in command && "execute" in command) {
             // Load command to map
-            targetMap.set(command.data.name, command);
+            const data =
+                typeof command.data === "function"
+                    ? command.data()
+                    : command.data;
+            targetMap.set(data.name, command);
         } else {
             console.warn(
                 `[HOT-RELOAD] | [WARN] Command ${name} missing "data" or "execute" fields.`,
@@ -139,7 +143,13 @@ export const getCommands = () => commands;
 export const getSlashCommands = (cmds: Map<string, Command>) =>
     new Map([...cmds].filter(([_k, c]) => typeof c.execute === "function"));
 export const getCommandsArray = (cmds: Map<string, Command>) => [
-    ...cmds.values().map((cmd) => cmd.data.toJSON()),
+    ...cmds
+        .values()
+        .map((cmd) =>
+            typeof cmd.data === "function"
+                ? cmd.data().toJSON()
+                : cmd.data.toJSON(),
+        ),
 ];
 
 // Set REST API

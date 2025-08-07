@@ -7,13 +7,19 @@ import {
     EmbedFooterOptions,
     SlashCommandBuilder,
 } from "discord.js";
-import { Profession, Skill, SkillKind, User } from "../db/dbTypes";
+import { Profession, Settlement, Skill, SkillKind, User } from "../db/dbTypes";
 import { getGuildCommands } from "./commandLoader";
 import { getGuildTasks } from "./taskLoader";
 import { getConfig } from "./configLoader";
 import { getParisDatetimeSQLiteSafe } from "./taskUtils";
 
-export const reloadDummyDiscordUtils = "...";
+export const reloadDummyDiscordUtils = "..s.";
+
+export const dirName = (dir: string): string =>
+    dir.replace(/.*\/(dev|public)$/, "$1");
+export const getGuildId = (dirName: string): string =>
+    (dirName === "dev" ? process.env.DEV_GUILD_ID : process.env.GUILD_ID) ??
+    "0";
 
 export function getProfessionsStringSelectCommandArg(): {
     name: string;
@@ -46,20 +52,24 @@ export function getProfessionsStringSelectMessageComp(): {
     });
 }
 
+// For the following 3 functions:
+// dir: true means guildId is actually the __dirname to get the guild id from
 export function getCommandsHelper(
     guildId: string,
+    dir?: boolean,
 ): { name: string; value: string; args?: string[] | undefined }[] {
+    if (dir) guildId = getGuildId(dirName(guildId));
     const commands = getGuildCommands(guildId);
     return [
         ...commands.keys().map((k: string) => {
+            const data =
+                commands.get(k)?.data ??
+                new SlashCommandBuilder().setName("Unknown");
             return {
                 name: k,
                 value: k,
                 args: [
-                    ...(
-                        (commands.get(k)?.data as SlashCommandBuilder) ??
-                        new SlashCommandBuilder().setName("Unknown")
-                    )
+                    ...(typeof data === "function" ? data() : data)
                         .toJSON()
                         .options!.map(
                             (option) =>
@@ -73,13 +83,29 @@ export function getCommandsHelper(
 
 export function getTasksHelper(
     guildId: string,
+    dir?: boolean,
 ): { name: string; value: string }[] {
+    if (dir) guildId = getGuildId(dirName(guildId));
     const tasks = getGuildTasks(guildId);
     return [
         ...tasks.keys().map((k: string) => {
             return { name: k, value: k };
         }),
     ];
+}
+
+export function getSettlementsHelper(
+    guildId: string,
+    dir?: boolean,
+): { name: string; value: string }[] {
+    if (dir) guildId = getGuildId(dirName(guildId));
+    const claims = Settlement.fetchArray({ keys: "guild_id", values: guildId });
+    return claims.map((s: Settlement) => {
+        return {
+            name: s.s_name,
+            value: `${s.id}`,
+        };
+    });
 }
 
 const levels: Record<number, number> = {

@@ -1,6 +1,5 @@
 import {
     ActionRowBuilder,
-    APIEmbedField,
     ButtonBuilder,
     ButtonInteraction,
     ButtonStyle,
@@ -8,23 +7,14 @@ import {
     MessageActionRowComponentBuilder,
     MessageFlags,
     SlashCommandBuilder,
-    TextChannel,
 } from "discord.js";
 import {
     primaryEmbed,
     warningEmbed,
     updateSkills,
-    getEmoji,
     getKind,
 } from "../../utils/discordUtils";
-import {
-    Config,
-    User,
-    Fournisseur,
-    Skill,
-    Profession,
-    SkillKind,
-} from "../../db/dbTypes";
+import { Config, User, Fournisseur, Skill, SkillKind } from "../../db/dbTypes";
 
 async function getProfileEmbed(
     userId: string,
@@ -54,9 +44,10 @@ async function getProfileEmbed(
                         keys: ["user_id", "guild_id"],
                         values: [userId, guildId],
                     })
-                        .map((f) => {
-                            return `- **${f.coordinator ? "🔧 Coordinateur" : "Fournisseur"}** de __${f.profession_name}__`;
-                        })
+                        .toSorted((f1, f2) =>
+                            f1.coordinator < f2.coordinator ? 1 : -1,
+                        )
+                        .map((f) => f.toString(true))
                         .join("\n") || "Aucun rôle de métier.",
             },
         ],

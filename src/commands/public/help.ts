@@ -6,15 +6,15 @@ import {
     MessageFlags,
 } from "discord.js";
 import {
+    dirName,
     getCommandsHelper,
+    getGuildId,
     getTasksHelper,
     personalEmbed,
 } from "../../utils/discordUtils";
 import { getGuildCommands } from "../../utils/commandLoader";
 import { getConfig } from "../../utils/configLoader";
 import { Config } from "../../db/dbTypes";
-
-const dirName = (): string => __dirname.replace(/.*\/(dev|public)$/, "$1");
 
 async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     const commandName = interaction.options.getString("commande");
@@ -23,11 +23,7 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
         embed.setFields([
             {
                 name: "__Commandes__:",
-                value: getCommandsHelper(
-                    (dirName() === "dev"
-                        ? process.env.DEV_GUILD_ID
-                        : process.env.GUILD_ID) ?? "0",
-                )
+                value: getCommandsHelper(__dirname, true)
                     .map(
                         (n) =>
                             `- **${n.name}**${(n.args?.length ?? 0 > 0) ? ` *(${n.args!.join(", ")})*` : ""}`,
@@ -36,11 +32,7 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
             },
             {
                 name: "__Tâches automatiques__:",
-                value: getTasksHelper(
-                    (dirName() === "dev"
-                        ? process.env.DEV_GUILD_ID
-                        : process.env.GUILD_ID) ?? "0",
-                )
+                value: getTasksHelper(__dirname, true)
                     .map((n) => `- **${n.name}**`)
                     .join("\n"),
             },
@@ -80,13 +72,7 @@ module.exports = {
                 .setName("commande")
                 .setDescription("Nom de la commande (optionel)")
                 .setRequired(false)
-                .addChoices(
-                    getCommandsHelper(
-                        (dirName() === "dev"
-                            ? process.env.DEV_GUILD_ID
-                            : process.env.GUILD_ID) ?? "0",
-                    ),
-                ),
+                .addChoices(getCommandsHelper(__dirname, true)),
         ),
 
     execute: help,
