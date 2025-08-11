@@ -1,4 +1,4 @@
-export const reloadDummyTaskUtils = "...";
+export const reloadDummyTaskUtils = "..s.";
 
 export function fakeParisTimeToUTC() {
     const now = new Date();
@@ -73,7 +73,9 @@ export function computeNextTimestamp(data: any) {
         // Difference (offset) due to checker
         if (data.nextTimestamp) next -= now.getTime() - data.nextTimestamp;
         return next;
-    }
+    } else if (!data.nextTimestamp && data.autoStart && data.repeat === 1)
+        // Task has to be ran once on task re/load and/or re/activation
+        return now.getTime() - 500; // ms (acceptable offset)
 
     throw new Error("No valid time or interval set.");
 }

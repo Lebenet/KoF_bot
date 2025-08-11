@@ -21,7 +21,6 @@ import {
     Interaction,
     MessageFlags,
     ModalSubmitInteraction,
-    StringSelectMenuInteraction,
 } from "discord.js";
 
 import { start } from "./utils/watcher";
@@ -31,8 +30,6 @@ import { getSlashCommands, getGuildCommands } from "./utils/commandLoader";
 import { getConfig, setDb, setBot } from "./utils/configLoader";
 
 import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
-
-import { startTaskRunner } from "./utils/taskRunner";
 
 import { db } from "./db/dbConn";
 setDb(db);
@@ -64,10 +61,6 @@ client.login(token).then(() => {
     // Start watcher
     console.log(`[STARTUP] Starting watcher...`);
     start();
-
-    // Start task runner
-    console.log(`[STARTUP] Starting task runner...`);
-    startTaskRunner();
 });
 
 async function handleDeferredReply(

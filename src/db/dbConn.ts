@@ -184,7 +184,7 @@ const tables = [
 	END;`,
 ];
 
-function init() {
+export function init() {
     // Make sure every table exists correctly
     console.log("[STARTUP] Making sure DB schema is correct...");
     for (const table of tables) {

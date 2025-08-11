@@ -4,8 +4,9 @@ import {
     MessageFlags,
 } from "discord.js";
 import { primaryEmbed, xpToLevel } from "../../utils/discordUtils";
-import { Config, Skill, User, Profession } from "../../db/dbTypes";
+import { Skill, User, Profession } from "../../db/dbTypes";
 import { getParisDatetimeSQLiteSafe } from "../../utils/taskUtils";
+import { Config } from "../../utils/configLoader";
 
 async function link(interaction: ChatInputCommandInteraction, config: Config) {
     let playerId: string = interaction.options.getString("player_id") ?? "";

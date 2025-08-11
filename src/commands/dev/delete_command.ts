@@ -4,8 +4,9 @@ import {
     PermissionFlagsBits,
     SlashCommandBuilder,
 } from "discord.js";
-import { Config, Command } from "../../db/dbTypes";
+import { Command } from "../../db/dbTypes";
 import { warningEmbed } from "../../utils/discordUtils";
+import { Config } from "../../utils/configLoader";
 
 module.exports = {
     data: new SlashCommandBuilder()

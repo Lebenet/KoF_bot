@@ -14,7 +14,8 @@ import {
     updateSkills,
     getKind,
 } from "../../utils/discordUtils";
-import { Config, User, Fournisseur, Skill, SkillKind } from "../../db/dbTypes";
+import { User, Fournisseur, Skill, SkillKind } from "../../db/dbTypes";
+import { Config } from "../../utils/configLoader";
 
 async function getProfileEmbed(
     userId: string,

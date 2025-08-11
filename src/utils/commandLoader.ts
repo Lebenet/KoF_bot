@@ -9,8 +9,8 @@ import {
     Routes,
     SlashCommandBuilder,
 } from "discord.js";
-import { Config } from "../db/dbTypes";
-import { __get_commands } from "./states";
+import { Config } from "../utils/configLoader";
+import * as states from "./states";
 
 export const reloadDummyConmmandLoader = "..s.";
 
@@ -33,13 +33,13 @@ export type Commands = {
 };
 
 // Dynamically loaded commands
-const commands = __get_commands();
+const commands = states.__get_commands();
 
 const publicDir = "./commands/public/";
 const devDir = "./commands/dev/";
 
 export function unloadCommand(
-    file: string,
+    file: string, // deprecated but can't be bothered
     filePath: string,
     targetMap: Map<string, Command>,
 ) {
@@ -49,19 +49,19 @@ export function unloadCommand(
         const oldMod = require.cache[modPath];
 
         // Deep cleaning
-        oldMod?.children.forEach((dep) => {
-            if (!dep.path.toLowerCase().endsWith("watcher.js"))
-                delete require.cache[dep.id];
-        });
+        // oldMod?.children.forEach((dep) => {
+        //     if (!dep.path.toLowerCase().endsWith("watcher.js"))
+        //         delete require.cache[dep.id];
+        // });
 
         delete require.cache[modPath];
+
+        // Delete command from map
+        targetMap.delete(oldMod?.exports.data.name);
     } catch (err) {
         console.error("File did not need reloading", err);
         // just means didn't need reloading
     }
-
-    // Delete command from map
-    targetMap.delete(file.replace(".js", ""));
 }
 
 export function loadCommand(file: string, dir: string) {

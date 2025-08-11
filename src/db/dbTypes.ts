@@ -1,6 +1,6 @@
 // UNFINISHED: simple ORM attempt
 
-import { APIEmbedField, Client } from "discord.js";
+import { APIEmbedField } from "discord.js";
 import { db } from "./dbConn";
 import Database from "better-sqlite3";
 import { getParisDatetimeSQLiteSafe } from "../utils/taskUtils";
@@ -702,14 +702,6 @@ export class SettlementMember extends Model {
     public user_id!: string;
     public perm_level!: number;
 }
-
-export type Config = {
-    locked: boolean;
-    bot: Client;
-    db: Database.Database;
-    admins: Array<string>;
-    [key: string]: any;
-};
 
 export enum SkillKind {
     Profession = "profession",

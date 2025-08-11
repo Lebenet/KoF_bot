@@ -6,7 +6,8 @@ import {
     Client,
     MessageFlags,
 } from "discord.js";
-import { User, Fournisseur, Settlement, Config } from "../../db/dbTypes";
+import { User, Fournisseur, Settlement } from "../../db/dbTypes";
+import { Config } from "../../utils/configLoader";
 import {
     getProfessionsStringSelectCommandArg,
     getSettlementsHelper,

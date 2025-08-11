@@ -1,3 +1,4 @@
+// Loaded from the file
 export type TaskDataLoad = {
     name: string;
     interval?: null | number; // interval in minutes
@@ -6,13 +7,17 @@ export type TaskDataLoad = {
     autoStart?: null | boolean; // task will auto activate on every bot startup if true
     runOnStart?: null | boolean; // run once on bot startup (counts for repeats)
     repeat?: null | number; // 0 means infinite, once all repetitions are done, will need to be manually reactivated
+    notResetOnReload?: null | boolean; // Not reset timestamp when the task is reloaded
 };
 
+// Additional fields for task data (mostly internal use)
 export type TaskData = {
     [key: string]: any;
-    activated?: boolean;
-    nextTimestamp?: number;
-    repeats?: number;
+    guildId?: string; // Guild id the task is executed for
+    activated?: boolean; // Whether or not it is activated
+    nextTimestamp?: number; // Next time it will be ran
+    repeats?: number; // How many repeats are left
+    running?: boolean; // To ensure long-lasting tasks don't get activated twice
 } & TaskDataLoad;
 
 export type Task = {
@@ -34,12 +39,13 @@ Overall the same as commandLoader.js, with a few tweaks
 import fs from "fs";
 import path from "path";
 import { computeNextTimestamp } from "./taskUtils";
-import { Config } from "../db/dbTypes";
+import { Config } from "./configLoader";
 import { __get_tasks } from "./states";
 
 export const reloadDummyTaskLoader = "...";
 
 // Dynamically loaded tasks
+let __init = true;
 const tasks = __get_tasks();
 
 const publicDir = "./tasks/public/";
@@ -81,9 +87,10 @@ export function activateTask(task: Task) {
     if (task.data.repeat && task.data.repeat > 0)
         task.data.repeats = task.data.repeat;
     try {
-        task.data.nextTimestamp = task.data.runOnStart
-            ? 0
-            : computeNextTimestamp(task.data);
+        task.data.nextTimestamp =
+            task.data.runOnStart && __init
+                ? Date.now() - 500 // ms (acceptable offset)
+                : computeNextTimestamp(task.data);
     } catch (e) {
         console.error(`[ERROR] Task Activate:`, e);
         return false;
@@ -113,28 +120,45 @@ export function unloadTask(
     filePath: string,
     targetMap: Map<string, any>,
 ) {
-    // Delete task from require memory
     try {
+        // Get task from require memory
         const modPath = require.resolve(filePath);
         const oldMod = require.cache[modPath];
 
-        // Deep cleaning
-        oldMod?.children.forEach((dep) => {
-            if (!dep.path.toLowerCase().endsWith("watcher.js"))
-                delete require.cache[dep.id];
-        });
+        // console.log("require cache:\n", require.cache);
+        // console.log("require keys:", Object.keys(require.cache).filter((k) => k.includes("usr/bot/dist")));
+        // console.log("resolved mod:\n", oldMod);
+        // console.log("filePath:", filePath);
+        // console.log("resolved modPath:", modPath);
+        // console.log("has modpath:", Object.keys(require.cache).includes(modPath));
+        // console.log("file:", file);
+        // console.log("mod children:", oldMod?.children.map((m) => "- " + m.id ).join(",\n"));
 
+        // Deep cleaning
+        // TODO: better deep clean that will only clean the changed dependencies (dunno how)
+        //oldMod?.children.forEach((dep) => {
+        //    if (!dep.path.toLowerCase().match(/(?:watcher|main).js$/))
+        //        delete require.cache[dep.id];
+        //});
+
+        // Delete task from require memory
         delete require.cache[modPath];
+
+        // Delete task from map
+        //console.log(targetMap.keys());
+        //console.log(oldMod?.exports.data.name);
+        targetMap.delete(oldMod?.exports.data.name);
     } catch (err) {
-        console.log(err);
+        console.error(
+            `[ERROR] Hot-reload: error while unloading task ${file}:\n`,
+            err,
+        );
         // just means didn't need reloading
     }
-
-    // Delete task from map
-    targetMap.delete(file.replace(".js", ""));
 }
 
 export function loadTask(file: string, dir: string) {
+    console.log("cacaaaaha");
     const targetMap =
         dir === devDir
             ? tasks.dev
@@ -159,9 +183,14 @@ export function loadTask(file: string, dir: string) {
     const filePath = path.resolve(path.join(dir, file));
     console.log(filePath, file, dir);
 
-    unloadTask(file, filePath, targetMap);
-
     try {
+        // Get current loaded task (if it exists)
+        const currTask = require.cache[require.resolve(filePath)];
+        const nreset: boolean = currTask?.exports.data.notResetOnReload
+            ? true
+            : false;
+        if (currTask) unloadTask(file, filePath, targetMap);
+
         // Load task to require memory
         const task: Task = require(filePath);
 
@@ -169,8 +198,17 @@ export function loadTask(file: string, dir: string) {
             // Load task to map
             task.data.guildId = guildId; // Used later in taskRunner and available in task.run()
             targetMap.set(task.data.name, task);
-            if (task.data.autostart || task.data.runOnStart)
+            if (task.data.autoStart || (task.data.runOnStart && __init))
                 activateTaskByName(task.data.name, guildId);
+
+            // if notResetOnReload has been set (override runner data for the task)
+            if (nreset) {
+                // Meaning it will only get reset with a manual reset or after all iterations have been done
+                // New data will not be applied until manual reset/repeats completing, but behaviour does change
+                task.data.nextTimestamp = currTask?.exports.data.nextTimestamp;
+                task.data.repeats = currTask?.exports.data.repeats;
+                task.data.activated = currTask?.exports.data.activated;
+            }
         } else {
             console.warn(
                 `[HOT-RELOAD] | [WARN] task ${name} missing "data" or "execute" fields.`,
@@ -186,6 +224,8 @@ export function loadTask(file: string, dir: string) {
 }
 
 export function initTaskLoad() {
+    __init = true;
+
     // Load public tasks
     fs.readdirSync(publicDir)
         .filter((file) => file.endsWith(".js"))
@@ -195,6 +235,8 @@ export function initTaskLoad() {
     fs.readdirSync(devDir)
         .filter((file) => file.endsWith(".js"))
         .forEach((file) => loadTask(file, devDir));
+
+    __init = false;
 }
 
 export const getGuildTasks = (guildId: string): Map<string, Task> => {

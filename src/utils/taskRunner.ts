@@ -1,5 +1,5 @@
 import { computeNextTimestamp, getParisDatetimeSQLiteSafe } from "./taskUtils";
-import { getTasks, deactivateTask } from "./taskLoader";
+import { getTasks, deactivateTask, Task } from "./taskLoader";
 import { getConfig } from "./configLoader";
 
 export const reloadDummyTaskRunner = "...";
@@ -20,20 +20,29 @@ export function stopTaskRunner() {
     intervalId = null;
 }
 
-async function runTask(task: any) {
+async function runTask(task: Task) {
+    if (task.data.running) {
+        console.log(
+            `[TASK] Task ${task.data.name} is already running, skipping.`,
+        );
+        return;
+    }
+
     try {
         const config = getConfig();
+        task.data.running = true;
 
         await task.run(task.data, config);
+        task.data.running = false;
 
         // Handle repeated tasks
-        if (task.data.repeats > 1) {
+        if (task.data.repeats && task.data.repeats > 1) {
             task.data.repeats--;
         } else if (task.data.repeats === 1) {
             deactivateTask(task);
         }
     } catch (err) {
-        console.log(
+        console.error(
             `[ERROR] Task ${task.data.name} run: an error occured:\n`,
             err,
         );
@@ -44,7 +53,7 @@ async function runTask(task: any) {
             task.data.nextTimestamp = computeNextTimestamp(task.data);
         else task.data.nextTimestamp = undefined;
     } catch (err) {
-        console.log(
+        console.warn(
             `[WARN] Task ${task.data.name} computeNextTimestamp failed:`,
             err,
             "\n deactivating task.",
@@ -52,9 +61,14 @@ async function runTask(task: any) {
         task.data.activated = false;
     }
 
-    console.log(
-        `[TASK] Task ${task.data.name} ran succesfully, and next timestamp has been set. (${new Date(task.data.nextTimestamp).toString()})`,
-    );
+    if (task.data.nextTimestamp)
+        console.log(
+            `[TASK] Task ${task.data.name} ran succesfully, and next timestamp has been set. (${new Date(task.data.nextTimestamp).toString()})`,
+        );
+    else
+        console.log(
+            `[TASK] Task ${task.data.name} ran succesfully, and has now been deactivated.`,
+        );
 }
 
 async function checker() {

@@ -316,15 +316,21 @@ export type EmbedType = {
 // End Custom Embed Builder
 
 export async function updateSkills(
-    userId: string,
+    user: string | User,
 ): Promise<
     { success: false; error?: string } | { success: true; message?: string }
 > {
-    const user = new User();
-    user.id = userId;
-    if (!user.sync()) {
-        console.error(`[ERROR] updateSkills: DB error on user sync.`);
-        return { success: false, error: "Erreur de DB ! Veuillez réessayer." };
+    if (typeof user === "string") {
+        const usr = new User();
+        usr.id = user;
+        if (!usr.sync()) {
+            console.error(`[ERROR] updateSkills: DB error on user sync.`);
+            return {
+                success: false,
+                error: "Erreur de DB ! Veuillez réessayer.",
+            };
+        }
+        user = usr;
     }
 
     const playerId = user.player_id;

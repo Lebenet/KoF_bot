@@ -5,7 +5,6 @@ import {
     SlashCommandBuilder,
     EmbedBuilder,
     Client,
-    SharedSlashCommand,
 } from "discord.js";
 
 type SubInteractionHandler = (...args: [Interaction, Config]) => Promise<void>;
@@ -24,6 +23,7 @@ type Commands = {
     toString: (guildId?: string) => string;
 };
 
+// Loaded from the file
 type TaskDataLoad = {
     name: string;
     interval?: null | number; // interval in minutes
@@ -32,13 +32,17 @@ type TaskDataLoad = {
     autoStart?: null | boolean; // task will auto activate on every bot startup if true
     runOnStart?: null | boolean; // run once on bot startup (counts for repeats)
     repeat?: null | number; // 0 means infinite, once all repetitions are done, will need to be manually reactivated
+    notResetOnReload?: null | boolean; // Not reset timestamp when the task is reloaded
 };
 
+// Additional fields for task data (mostly internal use)
 type TaskData = {
     [key: string]: any;
-    activated?: boolean;
-    nextTimestamp?: number;
-    repeats?: number;
+    guildId?: string; // Guild id the task is executed for
+    activated?: boolean; // Whether or not it is activated
+    nextTimestamp?: number; // Next time it will be ran
+    repeats?: number; // How many repeats are left
+    running?: boolean; // To ensure long-lasting tasks don't get activated twice
 } & TaskDataLoad;
 
 type Task = {
@@ -96,12 +100,30 @@ if (!globalThis.__tasks)
             let res = "";
             if (!guildId || guildId === process.env.DEV_GUILD_ID) {
                 res += "Dev: {\n";
-                res += [...this.dev.keys()].map((k) => "- " + k).join("\n");
+                res += [...this.dev.entries()]
+                    .map(
+                        ([k, t]) =>
+                            "- " +
+                            k +
+                            (t.data.nextTimestamp
+                                ? `(${new Date(t.data.nextTimestamp).toString()})`
+                                : ""),
+                    )
+                    .join("\n");
                 res += "\n}\n";
             }
             if (!guildId || guildId === process.env.GUILD_ID) {
                 res += "Public: {\n";
-                res += [...this.public.keys()].map((k) => "- " + k).join("\n");
+                res += [...this.public.entries()]
+                    .map(
+                        ([k, t]) =>
+                            "- " +
+                            k +
+                            (t.data.nextTimestamp
+                                ? `(${new Date(t.data.nextTimestamp).toString()})`
+                                : ""),
+                    )
+                    .join("\n");
                 res += "\n}\n";
             }
             return res;

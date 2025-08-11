@@ -14,7 +14,7 @@ import {
 } from "../../utils/discordUtils";
 import { getGuildCommands } from "../../utils/commandLoader";
 import { getConfig } from "../../utils/configLoader";
-import { Config } from "../../db/dbTypes";
+import { Config } from "../../utils/configLoader";
 
 async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     const commandName = interaction.options.getString("commande");

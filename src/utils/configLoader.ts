@@ -3,13 +3,20 @@ import path from "path";
 import { exit } from "process";
 import Database from "better-sqlite3";
 import { Client } from "discord.js";
-import { Config } from "../db/dbTypes";
-import { __get_config } from "./states";
+import * as states from "./states";
+
+export type Config = {
+    locked: boolean;
+    bot: Client;
+    db: Database.Database;
+    admins: Array<string>;
+    [key: string]: any;
+};
 
 export const reloadDummyConfigLoader = "...";
 
 // Dynamic config holder
-const config: Partial<Config> | Config = __get_config();
+const config: Partial<Config> | Config = states.__get_config();
 
 export const lockBot = () => (config.locked = true);
 export const unlockBot = () => (config.locked = false);

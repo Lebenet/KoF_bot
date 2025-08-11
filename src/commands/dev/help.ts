@@ -12,7 +12,7 @@ import {
 } from "../../utils/discordUtils";
 import { getGuildCommands } from "../../utils/commandLoader";
 import { getConfig } from "../../utils/configLoader";
-import { Config } from "../../db/dbTypes";
+import { Config } from "../../utils/configLoader";
 
 const dirName = (): string => __dirname.replace(/.*\/(dev|public)$/, "$1");
 

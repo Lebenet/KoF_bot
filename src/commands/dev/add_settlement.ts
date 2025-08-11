@@ -6,7 +6,8 @@ import {
     User,
 } from "discord.js";
 import { primaryEmbed } from "../../utils/discordUtils";
-import { Config, Settlement, User as DbUser } from "../../db/dbTypes";
+import { Settlement, User as DbUser } from "../../db/dbTypes";
+import { Config } from "../../utils/configLoader";
 
 async function addSettlement(
     interaction: ChatInputCommandInteraction,

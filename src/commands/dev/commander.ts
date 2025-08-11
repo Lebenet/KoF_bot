@@ -31,13 +31,14 @@ import {
     MessageType,
 } from "discord.js";
 
+import { Config } from "../../utils/configLoader";
+
 import {
     Command,
     CommandItem,
     CommandProfession,
     CommandAssignee,
     ChannelParam,
-    Config,
     User,
     Fournisseur,
     Settlement,
