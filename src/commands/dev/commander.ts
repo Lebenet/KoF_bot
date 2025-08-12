@@ -1136,6 +1136,11 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
+    if (command.status.toLowerCase() !== "ready") {
+        interaction.editReply("Cette commande n'est pas encore confirmée !");
+        return;
+    }
+
     if (
         interaction.user.id !== command.author_id &&
         !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
@@ -1187,11 +1192,6 @@ async function advanceItemHandler(
         return;
     }
 
-    if (command.status.toLowerCase() !== "ready") {
-        interaction.editReply("Cette commande n'est pas encore confirmée !");
-        return;
-    }
-
     const qtyRaw = interaction.fields.getField("quantity");
     if (!qtyRaw.value.trim().match(/^(?=.*\d)[\d\s,_-]+$/)) {
         interaction.editReply("Mauvais format! Nombre uniquement svp");
@@ -1233,6 +1233,11 @@ async function completeItemHandler(
         interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
+        return;
+    }
+
+    if (command.status.toLowerCase() !== "ready") {
+        interaction.editReply("Cette commande n'est pas encore confirmée !");
         return;
     }
 
