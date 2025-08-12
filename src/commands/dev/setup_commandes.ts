@@ -9,7 +9,7 @@ import {
     ForumChannel,
 } from "discord.js";
 import { ChannelParam, Settlement } from "../../db/dbTypes";
-import { getSettlementsHelper } from "../../utils/discordUtils";
+import { getSettlementsHelper, primaryEmbed } from "../../utils/discordUtils";
 
 async function setupCommands(
     interaction: ChatInputCommandInteraction,
@@ -156,4 +156,20 @@ module.exports = {
             .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     execute: setupCommands,
+    help: primaryEmbed({
+        title: "Setup Commandes | Aide",
+        description:
+            "" +
+            "Permet de setup un système de commande.\n" +
+            "Soit global, soit par settlement (claim).\n" +
+            "Utilisation: `/setup_commandes <panel> [<salon>] [<claim>]`\n" +
+            "\n" +
+            "Arguments: *(\* = obligatoire)*\n" +
+            "-# *vvv prérequis: salon texte*\n" +
+            "- \***__panel__**: salon où le résumé des commandes apparaîtra, pour que les joueurs puissent s'assigner à la tâche.\n" +
+            "-# *vvv prérequis: salon texte ou forum*\n" +
+            "- *__commandes__*: salon où les threads de commandes seront créés. Si non fourni, choisira par défaut le salon depuis lequel la commande est éxécutée.\n" +
+            '- *__claim__*: claim auquel ce système de commandes sera associé. Si non fourni, alors le système sera considéré comme "global" (ex. quand un joueur fait `/commander` sans fournir de `claim`).\n' +
+            "",
+    }),
 };

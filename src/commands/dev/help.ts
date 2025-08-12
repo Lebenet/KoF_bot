@@ -63,7 +63,11 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     }
     if (command.help)
         interaction.reply({
-            embeds: [command.help()],
+            embeds: [
+                typeof command.help === "function"
+                    ? command.help()
+                    : command.help,
+            ],
             flags: MessageFlags.Ephemeral,
         });
     else
