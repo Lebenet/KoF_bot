@@ -45,10 +45,8 @@ import {
 } from "../../db/dbTypes";
 
 import {
-    dirName,
     getProfessionsStringSelectMessageComp,
     getSettlementsHelper,
-    shortenEmbedFieldValue,
     shortenMessage,
     shortenText,
     shortenTitle,
@@ -1186,6 +1184,11 @@ async function advanceItemHandler(
         interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
+        return;
+    }
+
+    if (command.status.toLowerCase() !== "ready") {
+        interaction.editReply("Cette commande n'est pas encore confirmée !");
         return;
     }
 
