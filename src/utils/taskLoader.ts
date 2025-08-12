@@ -158,7 +158,6 @@ export function unloadTask(
 }
 
 export function loadTask(file: string, dir: string) {
-    console.log("cacaaaaha");
     const targetMap =
         dir === devDir
             ? tasks.dev
