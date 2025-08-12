@@ -353,7 +353,7 @@ async function manageProfessionsHandler(
         interaction.user.id !== command.author_id &&
         !config.admins?.includes(interaction.user.id)
     ) {
-        interaction.editReply("Cette commande ne vous appartient pas.");
+        interaction.editReply("Cette commande ne vous appartient pas.").catch();
         return;
     }
 
@@ -366,7 +366,7 @@ async function manageProfessionsHandler(
         prof.profession_name = s;
         prof.filled = false;
         if (!prof.insert()) {
-            await interaction.editReply("L'interaction a échouée.");
+            await interaction.editReply("L'interaction a échouée.").catch();
             profs.forEach((p) => p.delete());
             return;
         }
@@ -431,7 +431,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
         interaction.user.id !== command.author_id &&
         !config.admins?.includes(interaction.user.id)
     ) {
-        interaction.editReply("Cette commande ne vous appartient pas.");
+        interaction.editReply("Cette commande ne vous appartient pas.").catch();
         return;
     }
 
@@ -503,7 +503,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         interaction.user.id !== command.author_id &&
         !config.admins?.includes(interaction.user.id)
     ) {
-        interaction.editReply("Cette commande ne vous appartient pas.");
+        interaction.editReply("Cette commande ne vous appartient pas.").catch();
         return;
     }
 
@@ -587,7 +587,9 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     command.panel_message_id = panelMsg.id;
     command.status = "Ready";
     if (!command.update()) {
-        interaction.editReply("Erreur de database! L'interaction a échouée.");
+        interaction
+            .editReply("Erreur de database! L'interaction a échouée.")
+            .catch();
         panelMsg.delete();
         return;
     }
@@ -664,13 +666,15 @@ async function assignHandler(
             | TextChannel
     ).threads.cache.get(command.thread_id);
     if (!thread) {
-        interaction.editReply("Le thread de la commande a été supprimé !");
+        interaction
+            .editReply("Le thread de la commande a été supprimé !")
+            .catch();
         command.delete();
         interaction.message.delete();
         return;
     }
 
-    await interaction.editReply("Création des rôles dans la bdd...");
+    await interaction.editReply("Création des rôles dans la bdd...").catch();
 
     const insertAssignees: CommandAssignee[] = [];
     for (const [id, user] of users) {
@@ -687,7 +691,9 @@ async function assignHandler(
 
         // Try to insert in DB
         if (!assign.insert()) {
-            interaction.editReply("Erreur de Database, veuillez réessayer.");
+            interaction
+                .editReply("Erreur de Database, veuillez réessayer.")
+                .catch();
             insertAssignees.forEach((a) => a.delete());
             return;
         }
@@ -782,7 +788,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
     assign.command_id = command.id;
     assign.user_id = interaction.user.id;
     if (!assign.insert()) {
-        interaction.editReply("Vous êtes déjà sur cette commande.");
+        interaction.editReply("Vous êtes déjà sur cette commande.").catch();
         return;
     }
 
@@ -987,7 +993,9 @@ async function addItemsHandler(
         command.settlement_id,
     );
     if (!channel) {
-        interaction.editReply("Salon de commandes a été retiré de la config!");
+        interaction
+            .editReply("Salon de commandes a été retiré de la config!")
+            .catch();
         return;
     }
 
@@ -1128,16 +1136,23 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
     item.id = itemId;
 
     if (!command.sync() || !item.sync()) {
-        interaction.reply({
-            content:
-                "Erreur de Database, pas réussi à enregistrer l'interaction.",
-            flags: MessageFlags.Ephemeral,
-        });
+        interaction
+            .reply({
+                content:
+                    "Erreur de Database, pas réussi à enregistrer l'interaction.",
+                flags: MessageFlags.Ephemeral,
+            })
+            .catch();
         return;
     }
 
     if (command.status.toLowerCase() !== "ready") {
-        interaction.editReply("Cette commande n'est pas encore confirmée !");
+        interaction
+            .reply({
+                content: "Cette commande n'est pas encore confirmée !",
+                flags: MessageFlags.Ephemeral,
+            })
+            .catch();
         return;
     }
 
@@ -1148,10 +1163,12 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
             .includes(interaction.user.id) &&
         !config.admins?.includes(interaction.user.id)
     ) {
-        interaction.reply({
-            content: "Cette commande ne vous appartient pas.",
-            flags: MessageFlags.Ephemeral,
-        });
+        interaction
+            .reply({
+                content: "Cette commande ne vous appartient pas.",
+                flags: MessageFlags.Ephemeral,
+            })
+            .catch();
         return;
     }
 
@@ -1194,7 +1211,7 @@ async function advanceItemHandler(
 
     const qtyRaw = interaction.fields.getField("quantity");
     if (!qtyRaw.value.trim().match(/^(?=.*\d)[\d\s,_-]+$/)) {
-        interaction.editReply("Mauvais format! Nombre uniquement svp");
+        interaction.editReply("Mauvais format! Nombre uniquement svp").catch();
         return;
     }
 
@@ -1237,7 +1254,9 @@ async function completeItemHandler(
     }
 
     if (command.status.toLowerCase() !== "ready") {
-        interaction.editReply("Cette commande n'est pas encore confirmée !");
+        interaction
+            .editReply("Cette commande n'est pas encore confirmée !")
+            .catch();
         return;
     }
 
@@ -1248,7 +1267,7 @@ async function completeItemHandler(
             .includes(interaction.user.id) &&
         !config.admins?.includes(interaction.user.id)
     ) {
-        interaction.editReply("Cette commande ne vous appartient pas.");
+        interaction.editReply("Cette commande ne vous appartient pas.").catch();
         return;
     }
 
