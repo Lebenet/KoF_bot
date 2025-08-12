@@ -6,9 +6,7 @@ import {
     MessageFlags,
 } from "discord.js";
 import {
-    dirName,
     getCommandsHelper,
-    getGuildId,
     getTasksHelper,
     personalEmbed,
 } from "../../utils/discordUtils";
@@ -16,10 +14,12 @@ import { getGuildCommands } from "../../utils/commandLoader";
 import { getConfig } from "../../utils/configLoader";
 import { Config } from "../../utils/configLoader";
 
+const dirName = (): string => __dirname.replace(/.*\/(dev|public)$/, "$1");
+
 async function help(interaction: ChatInputCommandInteraction, _config: Config) {
     const commandName = interaction.options.getString("commande");
     if (!commandName) {
-        const embed: EmbedBuilder = module.exports.help;
+        const embed: EmbedBuilder = module.exports.help();
         embed.setFields([
             {
                 name: "__Commandes__:",
@@ -37,6 +37,7 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
                     .join("\n"),
             },
         ]);
+        /*
         interaction.user.send({
             embeds: [embed],
         });
@@ -44,18 +45,31 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
             content: "Réponse envoyée en DM !",
             flags: MessageFlags.Ephemeral,
         });
+        */
+        interaction.reply({
+            embeds: [embed],
+            flags: MessageFlags.Ephemeral,
+        });
         return;
     }
 
     const command = getGuildCommands(interaction.guildId!).get(commandName);
     if (!command) {
-        interaction.reply({
-            content: "Commande inconnue du bot ?",
+        await interaction.reply({
+            content: "Commande n'existe pas selon le bot?",
             flags: MessageFlags.Ephemeral,
         });
         return;
     }
-    if (command.help) interaction.reply({ embeds: [command.help()] });
+    if (command.help)
+        interaction.reply({
+            embeds: [
+                typeof command.help === "function"
+                    ? command.help()
+                    : command.help,
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
     else
         interaction.reply({
             content: "Cette commande n'a pas de message d'aide défini !",
@@ -80,12 +94,12 @@ module.exports = {
         personalEmbed(
             {
                 title: "Liste des commandes et tâches du serveur:",
-                description:
-                    "*Si vous souhaitez afficher l'aide d'un commande en particulier, faites `/help <commande>`.\n \
-			L'aide pour les tâches automatiques n'est pas encore supporté.*",
+                description: `*Si vous souhaitez afficher l'aide d'un commande en particulier, faites \`/help <commande>\`.
+                    L'aide pour les tâches automatiques n'est pas encore supporté.
+                    **\\***: Argument obligatoire. *`,
                 fields: [
                     {
-                        name: "Error 22",
+                        name: "Error",
                         value: "Something went wrong, please ask an admin to reload this command.",
                     },
                 ],
