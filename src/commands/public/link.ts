@@ -32,6 +32,9 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
     // Once playerId is set;
     const res = await fetch(`https://bitjita.com/api/players/${playerId}`, {
         method: "GET",
+        headers: {
+            "User-Agent": "Notary - lebenet on discord",
+        }
     });
     try {
         const json = await res.json();

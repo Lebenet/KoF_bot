@@ -384,6 +384,9 @@ export async function updateSkills(
     // Fetch data
     const res = await fetch(`https://bitjita.com/api/players/${playerId}`, {
         method: "GET",
+        headers: {
+            "User-Agent": "Notary - lebenet on discord",
+        }
     });
 
     // Try to parse it
