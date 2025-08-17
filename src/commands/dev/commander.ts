@@ -1099,46 +1099,96 @@ async function addItemsHandler(
             item.delete();
         } else msg.pin();
     });
+
+    // Update panel message
     if (command.panel_message_id) updatePanel(command, config);
+
+    // Add items follow-up in thread
+    const srcMsg = await thread.messages.fetch(command.message_id!);
+    const items = shortenText(
+        CommandItem.fetchArray({
+            keys: "command_id",
+            values: command.id,
+        })
+            .toSorted(
+                (i1, i2) =>
+                    i2.quantity - i2.progress - (i1.quantity - i1.progress),
+            )
+            .map((i) => {
+                const nameLim = shortenText(i.item_name, 40);
+                return i.progress >= i.quantity
+                    ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}***~~`
+                    : `- ${`**__${i.quantity - i.progress}__**`} [${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}**`;
+            })
+            .join("\n"),
+        2000,
+    );
+
+    srcMsg.edit({
+        content: items,
+        embeds: srcMsg.embeds,
+        components: srcMsg.components,
+    });
+
+    // Delete reply
     interaction.deleteReply();
 }
 
-function updateItem(
+async function updateItem(
     command: Command,
     item: CommandItem,
     config: Config,
     message?: Message<boolean>,
 ) {
-    if (!message) {
-        const param = ChannelParam.getParam(
-            command.guild_id,
-            "commander",
-            "commandes_channel_id",
-            command.settlement_id,
-        );
-        if (!param) return;
-        const threadSrc = config.bot.channels.cache.get(param.channel_id) as
-            | TextChannel
-            | ForumChannel
-            | undefined;
-        if (!threadSrc) return;
-        const thread = threadSrc.threads.cache.get(command.thread_id);
-        if (!thread) return;
+    let thread: ThreadChannel | undefined;
+    const param = ChannelParam.getParam(
+        command.guild_id,
+        "commander",
+        "commandes_channel_id",
+        command.settlement_id,
+    );
+    if (!param) return;
+    const threadSrc = config.bot.channels.cache.get(param.channel_id) as
+        | TextChannel
+        | ForumChannel
+        | undefined;
+    if (!threadSrc) return;
+    thread = threadSrc.threads.cache.get(command.thread_id);
+    if (!thread) return;
 
-        thread.messages.fetch(item.message_id!).then((msg) => {
-            if (item.progress >= item.quantity) msg.delete();
-            else
-                msg.edit(
-                    `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
-                );
-        });
-    } else {
-        if (item.progress >= item.quantity) message.delete();
-        else
-            message.edit(
-                `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
-            );
-    }
+    if (!message) message = await thread.messages.fetch(item.message_id!);
+
+    if (item.progress >= item.quantity) message.delete();
+    else
+        message.edit(
+            `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
+        );
+
+    const srcMsg = await thread.messages.fetch(command.message_id!);
+    const items = shortenText(
+        CommandItem.fetchArray({
+            keys: "command_id",
+            values: command.id,
+        })
+            .toSorted(
+                (i1, i2) =>
+                    i2.quantity - i2.progress - (i1.quantity - i1.progress),
+            )
+            .map((i) => {
+                const nameLim = shortenText(i.item_name, 40);
+                return i.progress >= i.quantity
+                    ? `- ✅ ~~*[${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}***~~`
+                    : `- ${`**__${i.quantity - i.progress}__**`} [${Math.min(i.progress, i.quantity)}/${i.quantity}] - **${nameLim}**`;
+            })
+            .join("\n"),
+        2000,
+    );
+
+    srcMsg.edit({
+        content: items,
+        embeds: srcMsg.embeds,
+        components: srcMsg.components,
+    });
 }
 
 async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
@@ -1247,7 +1297,7 @@ async function advanceItemHandler(
         return;
     }
 
-    if (item.message_id) updateItem(command, item, config);
+    if (item.message_id) await updateItem(command, item, config);
     if (command.panel_message_id) updatePanel(command, config);
     interaction.deleteReply();
 }
@@ -1295,7 +1345,8 @@ async function completeItemHandler(
         return;
     }
 
-    if (item.message_id) updateItem(command, item, config, interaction.message);
+    if (item.message_id)
+        await updateItem(command, item, config, interaction.message);
     if (command.panel_message_id) updatePanel(command, config);
     interaction.deleteReply();
 }
