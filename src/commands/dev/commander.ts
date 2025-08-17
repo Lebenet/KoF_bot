@@ -235,7 +235,7 @@ async function initHandler(
     command.author_id = interaction.user.id;
 
     if (!command.insert()?.sync()) {
-        thread.delete();
+        await thread.delete();
         await interaction.editReply(
             `Votre commande **${c_name}** n'a pas pu être créée (insert failed). Veuillez réessayer.`,
         );
@@ -333,7 +333,7 @@ async function initHandler(
 
         command.message_id = msg.id;
         if (!command.update()) {
-            thread.delete();
+            await thread.delete();
             command.delete();
             await interaction.editReply(
                 `Votre commande **${c_name}** n'a pas pu être créée (update failed). Veuillez réessayer.`,
@@ -421,12 +421,12 @@ async function manageProfessionsHandler(
         return newRow;
     });
 
-    msg.edit({
+    await msg.edit({
         embeds: [embed],
         components: updatedComponents,
     });
 
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 async function closeHandler(interaction: ButtonInteraction, config: Config) {
@@ -478,7 +478,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
                     ) ?? "❌ **FERME**",
                 ),
         ];
-        panelMessage.edit({
+        await panelMessage.edit({
             content: "Commande terminée.",
             embeds: embeds,
             components: [],
@@ -568,7 +568,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
             .editReply(
                 "Le salon panels n'a pas été défini! Faites d'abord `/setup_commandes` ou contactez un admin.",
             )
-            .catch();
+            .catch(console.log);
         command.delete();
         (interaction.channel as ThreadChannel).delete();
         return;
@@ -605,18 +605,18 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     if (!command.update()) {
         interaction
             .editReply("Erreur de database! L'interaction a échouée.")
-            .catch();
+            .catch(console.log);
         panelMsg.delete();
         return;
     }
 
     // Only edit after ready has been updated on database
-    msg.edit({
+    await msg.edit({
         embeds: [msgEmbed],
         components: [msgRow, msgRow2],
     });
 
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 async function assignHandler(
@@ -684,7 +684,7 @@ async function assignHandler(
     if (!thread) {
         interaction
             .editReply("Le thread de la commande a été supprimé !")
-            .catch();
+            .catch(console.log);
         command.delete();
         interaction.message.delete();
         return;
@@ -709,7 +709,7 @@ async function assignHandler(
         if (!assign.insert()) {
             interaction
                 .editReply("Erreur de Database, veuillez réessayer.")
-                .catch();
+                .catch(console.log);
             insertAssignees.forEach((a) => a.delete());
             return;
         }
@@ -724,13 +724,13 @@ async function assignHandler(
     // Edit assigned members
     const embed = getPanelEmbed(command);
 
-    interaction.message.edit({
+    await interaction.message.edit({
         content: interaction.message.content,
         embeds: [embed],
         components: interaction.message.components,
     });
 
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 async function claimHandler(interaction: ButtonInteraction, config: Config) {
@@ -748,7 +748,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
     // TODO: Make it so that only people from the right profession can claim to be apart of this order
 
     let thread: ThreadChannel | undefined;
-    let panelMsg: Message;
+    let panelMsg: Message | undefined;
     if (interaction.channelId === command.thread_id) {
         thread = interaction.channel as ThreadChannel;
 
@@ -766,8 +766,19 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         }
 
         panelMsg = (
-            config.bot.channels.cache.get(panel.channel_id) as TextChannel
-        ).messages.cache.get(command.panel_message_id!) as Message;
+            config.bot.channels.cache.get(panel.channel_id) as
+                | TextChannel
+                | undefined
+        )?.messages.cache.get(command.panel_message_id!) as Message | undefined;
+
+        if (!panelMsg) {
+            await interaction.followUp(
+                "Warning: Le message du panel n'a pas pu être trouvé !",
+            );
+            console.warn(
+                `[WARN] Commander|claimHandler: panel message not found (chanId: ${panel.channel_id}) (msgId: ${command.panel_message_id!})`,
+            );
+        }
     } else {
         const chan = ChannelParam.getParam(
             interaction.guildId!,
@@ -796,6 +807,15 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         panelMsg = interaction.channel!.messages.cache.get(
             command.panel_message_id!,
         )!;
+
+        if (!panelMsg) {
+            await interaction.followUp(
+                "Warning: Le message du panel n'a pas pu être trouvé !",
+            );
+            console.warn(
+                `[WARN] Commander|claimHandler: panel message not found (chanId: ${interaction.channel!.id}) (msgId: ${command.panel_message_id!})`,
+            );
+        }
     }
 
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
@@ -808,17 +828,18 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
-    thread.members.add(interaction.user);
+    thread.members.add(interaction.user).catch(console.log);
 
     const embed = getPanelEmbed(command);
 
-    panelMsg.edit({
-        content: panelMsg.content,
-        embeds: [embed],
-        components: panelMsg.components,
-    });
+    if (panelMsg)
+        await panelMsg.edit({
+            content: panelMsg.content,
+            embeds: [embed],
+            components: panelMsg.components,
+        });
 
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 async function addItemsSend(interaction: ButtonInteraction, config: Config) {
@@ -867,7 +888,7 @@ async function addItemsSend(interaction: ButtonInteraction, config: Config) {
     modal.addComponents(components);
 
     // Send modal
-    interaction.showModal(modal);
+    await interaction.showModal(modal);
 }
 
 function getPanelEmbed(command: Command): EmbedBuilder {
@@ -981,7 +1002,7 @@ async function updatePanel(command: Command, config: Config) {
                 content: msg.content,
                 embeds: [embed],
                 components: msg.components,
-            });
+            }).catch(console.log);
         })
         .catch(console.log);
 }
@@ -1011,7 +1032,7 @@ async function addItemsHandler(
     if (!channel) {
         interaction
             .editReply("Salon de commandes a été retiré de la config!")
-            .catch();
+            .catch(console.log);
         return;
     }
 
@@ -1124,14 +1145,14 @@ async function addItemsHandler(
         2000,
     );
 
-    srcMsg.edit({
+    await srcMsg.edit({
         content: items,
         embeds: srcMsg.embeds,
         components: srcMsg.components,
     });
 
     // Delete reply
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 async function updateItem(
@@ -1158,9 +1179,9 @@ async function updateItem(
 
     if (!message) message = await thread.messages.fetch(item.message_id!);
 
-    if (item.progress >= item.quantity) message.delete();
+    if (item.progress >= item.quantity) await message.delete();
     else
-        message.edit(
+        await message.edit(
             `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
         );
 
@@ -1184,7 +1205,7 @@ async function updateItem(
         2000,
     );
 
-    srcMsg.edit({
+    await srcMsg.edit({
         content: items,
         embeds: srcMsg.embeds,
         components: srcMsg.components,
@@ -1208,7 +1229,7 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
                     "Erreur de Database, pas réussi à enregistrer l'interaction.",
                 flags: MessageFlags.Ephemeral,
             })
-            .catch();
+            .catch(console.log);
         return;
     }
 
@@ -1218,7 +1239,7 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
                 content: "Cette commande n'est pas encore confirmée !",
                 flags: MessageFlags.Ephemeral,
             })
-            .catch();
+            .catch(console.log);
         return;
     }
 
@@ -1234,7 +1255,7 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
                 content: "Cette commande ne vous appartient pas.",
                 flags: MessageFlags.Ephemeral,
             })
-            .catch();
+            .catch(console.log);
         return;
     }
 
