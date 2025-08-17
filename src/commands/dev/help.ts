@@ -94,9 +94,10 @@ module.exports = {
         personalEmbed(
             {
                 title: "Liste des commandes et tâches du serveur:",
-                description: `*Si vous souhaitez afficher l'aide d'un commande en particulier, faites \`/help <commande>\`.
-                    L'aide pour les tâches automatiques n'est pas encore supporté.
-                    **\\***: Argument obligatoire. *`,
+                description:
+                    "*Si vous souhaitez afficher l'aide d'un commande en particulier, faites \`/help <commande>\`.*\n" +
+                    "*L'aide pour les tâches automatiques n'est pas encore supporté.*\n" +
+                    "**\\***: *Argument obligatoire.*",
                 fields: [
                     {
                         name: "Error",
