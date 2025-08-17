@@ -56,30 +56,39 @@ async function order(
     interaction: ChatInputCommandInteraction,
     _config: Config,
 ) {
-    let tryCmd: Command | null;
-    if (
-        (tryCmd = Command.get({
-            keys: "author_id",
-            values: interaction.user.id,
-        })) &&
-        tryCmd.status !== "Ready"
-    ) {
-        await interaction.reply(
-            "Tu as déjà une création de commande en cours (" +
-                interaction.guild?.name +
-                "). Finis ou annule ta premiere commande pour en faire une nouvelle.",
-        );
-        return;
-    }
-
+    // Guild ID from interaction
     const guildId = interaction.guild?.id ?? interaction.guildId ?? "0";
 
+    // Claim ID (?) from interaction options
     const claimId = interaction.options.getString("claim");
+
+    // Check that it is a correct claim
     let setl: Settlement | null = null;
     if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
     if (!setl && claimId) {
         await interaction.reply({
             content: "Claim pas trouvé !",
+            flags: MessageFlags.Ephemeral,
+        });
+        return;
+    }
+
+    // Check that the user isn't already prepping a command in that claim
+    let tryCmd: Command | null;
+    if (
+        (tryCmd = Command.get({
+            keys: ["author_id", "guild_id", "settlement_id"],
+            values: [interaction.user.id, guildId, claimId || null],
+        })) &&
+        tryCmd.status !== "Ready"
+    ) {
+        await interaction.reply({
+            content:
+                "Tu as déjà une création de commande en cours " +
+                (setl ? `pour le claim **${setl.s_name}**` : "") +
+                " (" +
+                `<#${tryCmd.thread_id}>` +
+                "). Confirme ou annule ta premiere commande pour en faire une nouvelle.",
             flags: MessageFlags.Ephemeral,
         });
         return;
@@ -101,7 +110,11 @@ async function order(
     if (!chan || !panel) {
         await interaction.reply({
             content:
-                "Cette commande n'a pas encore été __setup__. Merci de d'abord faire `/setup_commandes`.",
+                "Cette commande n'a pas encore été __setup__" +
+                (setl
+                    ? `Pour le claim **${setl.s_name}**. `
+                    : `.\n-# *rappel: \`/commander claim:<nom_du_claim>\` pour faire commande pour un claim spécifique.*\n`) +
+                "Merci de d'abord faire `/setup_commandes`.",
             flags: MessageFlags.Ephemeral,
         });
         return;

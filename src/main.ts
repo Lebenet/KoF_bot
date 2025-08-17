@@ -21,6 +21,7 @@ import {
     Interaction,
     MessageFlags,
     ModalSubmitInteraction,
+    AutocompleteInteraction,
 } from "discord.js";
 
 import { start } from "./utils/watcher";
@@ -144,6 +145,8 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
                 MessageFlags.Ephemeral,
             );
         }
+
+        return;
     }
 
     // Modal submit
@@ -185,14 +188,15 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         try {
             await command[handlerName](interaction, config);
         } catch (err) {
-            console.error(`[EXECUTE] An error occured:\n`, err);
+            console.error(`[MODALSUBMIT] An error occured:\n`, err);
             await handleDeferredReply(
                 interaction,
                 "An error occured while executing this command.",
                 MessageFlags.Ephemeral,
             );
         }
-        // console.log('received modal');
+
+        return;
     }
 
     // Button click
@@ -231,13 +235,15 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         try {
             await command[handlerName](interaction, config);
         } catch (err) {
-            console.error(`[EXECUTE] An error occured:\n`, err);
+            console.error(`[BUTTON] An error occured:\n`, err);
             await handleDeferredReply(
                 interaction,
                 "An error occured while executing this command.",
                 MessageFlags.Ephemeral,
             );
         }
+
+        return;
     }
 
     // SelectMenu
@@ -270,12 +276,47 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         try {
             await command[handlerName](interaction, config);
         } catch (err) {
-            console.error(`[EXECUTE] An error occured:\n`, err);
+            console.error(`[SELECTMENU] An error occured:\n`, err);
             await handleDeferredReply(
                 interaction,
                 "An error occured while registering this interaction.",
                 MessageFlags.Ephemeral,
             );
         }
+
+        return;
+    }
+
+    // Autocomplete
+    if (interaction.isAutocomplete()) {
+        // Reload safeguard
+        if (config.locked) {
+            await interaction.respond([
+                { name: "Erreur: bot est en train de reload !", value: 0 },
+            ]);
+            return;
+        }
+
+        // Handle
+        const guildId =
+            interaction.guildId ?? (interaction.guildId = "0") /* global */;
+        const command = getGuildCommands(guildId).get(interaction.commandName);
+
+        if (!command) {
+            await interaction.respond([
+                { name: "Commande n'existe pas selon le bot?", value: "0" },
+            ]);
+            return;
+        }
+
+        // Execute
+        try {
+            if (command.autocomplete)
+                await command.autocomplete(interaction, config);
+        } catch (err) {
+            console.error(`[AUTOCOMPLETE] An error occured:\n`, err);
+        }
+
+        return;
     }
 });

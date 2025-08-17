@@ -40,7 +40,7 @@ module.exports = {
         time: null, // tod to activate it, format "HH:MM" (can be an array)
         // if neither interval nor time is provided, task can only be run once if runOnStart is set to true
         autoStart: true, // task will auto activate on every bot startup if true
-        runOnStart: true, // run once on bot startup (counts for repeats)
+        runOnStart: true, // run once on bot startup (counts for repeats, also counts as autoStart)
         repeat: 0, // 0 means infinite, once all repetitions are done, will need to be manually reactivated
         notResetOnReload: true, // Not reset timestamp when the task is reloaded
 

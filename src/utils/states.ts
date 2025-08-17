@@ -5,12 +5,16 @@ import {
     SlashCommandBuilder,
     EmbedBuilder,
     Client,
+    AutocompleteInteraction,
 } from "discord.js";
 
 type SubInteractionHandler = (...args: [Interaction, Config]) => Promise<void>;
 
 type Command = {
     execute: (...args: [ChatInputCommandInteraction, Config]) => Promise<void>;
+    autocomplete?: (
+        ...args: [AutocompleteInteraction, Config]
+    ) => Promise<void>;
     data: SlashCommandBuilder | (() => SlashCommandBuilder);
     help?: () => EmbedBuilder;
 } & {

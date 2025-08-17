@@ -2,6 +2,7 @@
 import fs from "fs";
 import path from "path";
 import {
+    AutocompleteInteraction,
     ChatInputCommandInteraction,
     EmbedBuilder,
     Interaction,
@@ -20,6 +21,9 @@ export type SubInteractionHandler = (
 
 export type Command = {
     execute: (...args: [ChatInputCommandInteraction, Config]) => Promise<void>;
+    autocomplete?: (
+        ...args: [AutocompleteInteraction, Config]
+    ) => Promise<void>;
     data: SlashCommandBuilder | (() => SlashCommandBuilder);
     help?: () => EmbedBuilder;
 } & {
