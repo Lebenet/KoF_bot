@@ -47,6 +47,7 @@ import {
 import {
     getProfessionsStringSelectMessageComp,
     getSettlementsHelper,
+    primaryEmbed,
     shortenMessage,
     shortenText,
     shortenTitle,
@@ -1331,4 +1332,43 @@ module.exports = {
     readyHandler: readyHandler,
 
     manageProfessionsHandler: manageProfessionsHandler,
+
+    help: primaryEmbed({
+        title: "Commander | Aide",
+        description:
+            "" +
+            "Cette commande sert à passer commande auprès d'un claim, ou en global.\n" +
+            "__Utilisation__: `/commander [nom du claim]`.\n" +
+            'Si le nom du claim n\'est pas précisé, alors la commande sera "globale" (si tel à été setup).\n' +
+            "Sinon, la liste des claims proposé par le bot sont ceux pour lesquels le système de commande a été préparé.\n" +
+            "",
+        fields: [
+            {
+                name: "\u200e",
+                value: "\u200e",
+            },
+            {
+                name: "Etapes:",
+                value:
+                    "" +
+                    "- **Remplir un forms** (informations de base de la commande)\n" +
+                    "- **Un thread est créé** (vous serez ping + lien donné), dans lequel se trouvera votre commande.\n" +
+                    '- Il faudra dans ce thread **définir les items** de la commande *(bouton "Ajouter items")*, ainsi que **les professions concernées** *(menu de sélection)*.\n' +
+                    "- **Appuyer sur confirmer** pour ouvrir la commande, puis attendre sa complétion.\n" +
+                    '-# *(Il est possible de **fermer la commande** à tout moment avec le bouton rouge "Fermer").*',
+            },
+            {
+                name: "\u200e",
+                value: "\u200e",
+            },
+            {
+                name: "Assigner / Claim une commande:",
+                value:
+                    "" +
+                    "- Les __coordinateurs__ ont la possiblité de **claim/assigner** une commande depuis un panel réservé.\n" +
+                    "- Si un utilisateur est **assigné**, il sera ajouté __automatiquement__ au thread de la commande.\n" +
+                    '- **Pour pouvoir interagir avec une commande, il faut être assigné à une commande.** *(Le bouton "Claim" en-dessous du premier message du fil sert à s\'auto-assigner).*',
+            },
+        ],
+    }),
 };
