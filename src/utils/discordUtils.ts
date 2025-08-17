@@ -1,5 +1,7 @@
 import {
+    APIApplicationCommandOptionChoice,
     APIEmbedField,
+    APISelectMenuOption,
     ClientUser,
     Colors,
     EmbedAuthorOptions,
@@ -21,34 +23,43 @@ export const getGuildId = (dirName: string): string =>
     (dirName === "dev" ? process.env.DEV_GUILD_ID : process.env.GUILD_ID) ??
     "0";
 
-export function getProfessionsStringSelectCommandArg(): {
-    name: string;
-    value: string;
-}[] {
+export function getProfessionsStringSelectCommandArg(): APIApplicationCommandOptionChoice<string>[] {
     const ps = Profession.fetch();
     if (!ps)
         return [
             { name: "error:no_profession_found", value: "no_profession_found" },
         ];
     return (Array.isArray(ps) ? ps : [ps]).map((p) => {
-        return { name: p.description, value: p.p_name };
+        return { name: p.p_name, value: p.p_name };
     });
 }
 
-export function getProfessionsStringSelectMessageComp(): {
-    label: string;
-    value: string;
-}[] {
+export function getProfessionsStringSelectMessageComp(): APISelectMenuOption[] {
     const ps = Profession.fetch();
     if (!ps)
         return [
             {
-                label: "error:no_profession_found",
+                label: "error:",
+                description: "no_profession_found",
                 value: "no_profession_found",
             },
         ];
     return (Array.isArray(ps) ? ps : [ps]).map((p) => {
-        return { label: p.description, value: p.p_name };
+        const emojiParts: string[] = p.emoji
+            .replace(/[<>]/g, "")
+            .split(":")
+            .filter((e) => e);
+        const emoji = {
+            name: emojiParts[0],
+            id: emojiParts.length > 1 ? emojiParts[1] : undefined,
+        };
+
+        return {
+            label: p.description,
+            value: p.p_name,
+            description: p.p_name,
+            emoji: emoji,
+        };
     });
 }
 
@@ -386,7 +397,7 @@ export async function updateSkills(
         method: "GET",
         headers: {
             "User-Agent": "Notary - lebenet on discord",
-        }
+        },
     });
 
     // Try to parse it

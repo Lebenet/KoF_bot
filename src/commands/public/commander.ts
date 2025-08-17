@@ -112,7 +112,7 @@ async function order(
             content:
                 "Cette commande n'a pas encore été __setup__" +
                 (setl
-                    ? `Pour le claim **${setl.s_name}**. `
+                    ? ` pour le claim **${setl.s_name}**. `
                     : `.\n-# *rappel: \`/commander claim:<nom_du_claim>\` pour faire commande pour un claim spécifique.*\n`) +
                 "Merci de d'abord faire `/setup_commandes`.",
             flags: MessageFlags.Ephemeral,
