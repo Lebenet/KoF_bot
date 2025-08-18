@@ -5,6 +5,7 @@ import {
     EmbedBuilder,
     Client,
     MessageFlags,
+    GuildMember,
 } from "discord.js";
 import { User, Fournisseur, Settlement } from "../../db/dbTypes";
 import { Config } from "../../utils/configLoader";
@@ -23,6 +24,7 @@ async function manageProvider(
 
     // Get referenced member
     const user: DiscordUser | null = interaction.options.getUser("membre");
+    let member: GuildMember;
 
     // Guild ID
     const guildId: string = (interaction.guild?.id ??
@@ -108,11 +110,16 @@ async function manageProvider(
                 });
             });
         } else if (user) {
+            // set guild member
+            member = await interaction.guild!.members.fetch(user.id);
+
             // Change title
-            embed.setTitle(`Rôles de **__${user.displayName}__**`);
+            embed.setTitle(
+                `Rôles de **__${member.nickname ?? member.displayName}__**`,
+            );
             embed.addFields({
                 name: "Profile link",
-                value: `**<@${user.id}>** ||(${user.displayName})||`,
+                value: `**<@${user.id}>** ||(${member.nickname ?? member.displayName})||`,
                 inline: false,
             });
 
@@ -132,7 +139,7 @@ async function manageProvider(
 
             if (provs.length === 0) {
                 await interaction.editReply(
-                    `Pas de rôles trouvés pour **${user.displayName}**`,
+                    `Pas de rôles trouvés pour **${member.nickname ?? member.displayName}**`,
                 );
                 return;
             }
@@ -216,15 +223,15 @@ async function manageProvider(
     if (del && !coord) {
         if (!exists)
             await interaction.editReply(
-                `L'utilisateur **${user.displayName}** n'étais déjà **pas** __fournisseur__ pour **${prof}${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
+                `L'utilisateur **<@${user.id}>** n'étais déjà **pas** __fournisseur__ pour **${prof}${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
             );
         else if (exists.delete())
             await interaction.editReply(
-                `L'utilisateur **${user.displayName}** a bien été retiré de la liste de __fournisseurs__ pour **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
+                `L'utilisateur **<@${user.id}>** a bien été retiré de la liste de __fournisseurs__ pour **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
             );
         else
             await interaction.editReply(
-                `Une erreur s'est produite, **${user.displayName}** n'a pas pu être retiré de la DB en tant que _Fournisseur___${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
+                `Une erreur s'est produite, **<@${user.id}>** n'a pas pu être retiré de la DB en tant que _Fournisseur___${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
             );
     } else {
         const prov = new Fournisseur();
@@ -232,7 +239,7 @@ async function manageProvider(
             if (coord) {
                 if (exists.coordinator != del) {
                     await interaction.editReply(
-                        `**${user.displayName}** est déjà ${del ? "**pas**" : ""} __coordinateur__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
+                        `**<@${user.id}>** est déjà ${del ? "**pas**" : ""} __coordinateur__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
                     );
                     return;
                 } else {
@@ -240,7 +247,7 @@ async function manageProvider(
                 }
             } else {
                 await interaction.editReply(
-                    `**${user.displayName}** est déjà __fournisseur__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
+                    `**<@${user.id}>** est déjà __fournisseur__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
                 );
                 return;
             }
@@ -253,11 +260,11 @@ async function manageProvider(
         }
         if (exists && coord ? exists.update() : prov.insert())
             await interaction.editReply(
-                `**${user.displayName}** a bien été ${del ? "retiré" : "ajouté"} comme __${coord ? "coordinateur" : "fournisseur"}__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}`,
+                `**<@${user.id}>** a bien été ${del ? "retiré" : "ajouté"} comme __${coord ? "coordinateur" : "fournisseur"}__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}`,
             );
         else
             await interaction.editReply(
-                `Une erreur s'est produite, **${user.displayName}** n'a pas été ${del ? "retiré" : "ajouté"} comme __${coord ? "coordinateur" : "fournisseur"}__ pour **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}`,
+                `Une erreur s'est produite, **<@${user.id}>** n'a pas été ${del ? "retiré" : "ajouté"} comme __${coord ? "coordinateur" : "fournisseur"}__ pour **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}`,
             );
     }
 }

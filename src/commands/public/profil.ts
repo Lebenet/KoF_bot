@@ -19,9 +19,10 @@ import { Config } from "../../utils/configLoader";
 
 async function getProfileEmbed(
     userId: string,
-    guildId: string,
-    config: Config,
+    interaction: ChatInputCommandInteraction | ButtonInteraction,
 ) {
+    const guildId = interaction.guildId!;
+
     const user = new User();
     user.id = userId;
     if (!user.sync())
@@ -30,12 +31,15 @@ async function getProfileEmbed(
             description: "DB error",
         });
 
-    const dUser = await config.bot.users.fetch(userId)!;
+    const member = await interaction.guild!.members.fetch(userId);
     return primaryEmbed({
-        title: `Profil de ${dUser.displayName} (${user.player_username} in-game)`,
+        title: `Profil de ${member.nickname ?? member.displayName}${user.player_username !== "empty_game_username" ? ` (${user.player_username} in-game)` : ""}`,
         description:
             "*Cette page n'a pour l'instant pas beaucoup d'utilité.\nN'hésitez pas à en suggérer !\n-# **`lebenet`** en dm*",
-        author: { name: dUser.displayName, iconURL: dUser.displayAvatarURL() },
+        author: {
+            name: member.nickname ?? member.displayName,
+            iconURL: member.displayAvatarURL(),
+        },
         timestamp: true,
         fields: [
             {
@@ -55,7 +59,10 @@ async function getProfileEmbed(
     });
 }
 
-async function getSkillsEmbed(userId: string, config: Config) {
+async function getSkillsEmbed(
+    userId: string,
+    interaction: ChatInputCommandInteraction | ButtonInteraction,
+) {
     const user = new User();
     user.id = userId;
     if (!user.sync())
@@ -70,7 +77,7 @@ async function getSkillsEmbed(userId: string, config: Config) {
             description: "Cet utilisateur ne s'est pas encore `/link`.",
         });
 
-    const dUser = await config.bot.users.fetch(userId)!;
+    const member = await interaction.guild!.members.fetch(userId);
 
     const skills = Skill.fetchArray({
         keys: "user_id",
@@ -86,7 +93,10 @@ async function getSkillsEmbed(userId: string, config: Config) {
     );
 
     return primaryEmbed({
-        author: { name: dUser.displayName, iconURL: dUser.displayAvatarURL() },
+        author: {
+            name: member.nickname ?? member.displayName,
+            iconURL: member.displayAvatarURL(),
+        },
         title: `Tableau des __métiers__`,
         description: `*Utilisateur Discord: <@${user.id}>*`,
         fields: [
@@ -153,10 +163,10 @@ async function profil(
 
     const embeds = [
         displaySkills
-            ? await getSkillsEmbed(user.id, config)
-            : await getProfileEmbed(user.id, interaction.guildId!, config),
+            ? await getSkillsEmbed(user.id, interaction)
+            : await getProfileEmbed(user.id, interaction),
     ];
-    const components = await getComponents(
+    const components = getComponents(
         displaySkills,
         user.id,
         interaction.user.id,
@@ -175,9 +185,7 @@ async function gotoProfileHandler(
 ) {
     const [, , , targetId, authorId] = interaction.customId.split("|");
 
-    const embeds = [
-        await getProfileEmbed(targetId, interaction.guildId!, config),
-    ];
+    const embeds = [await getProfileEmbed(targetId, interaction)];
     const components = getComponents(false, targetId, authorId);
 
     interaction.update({
@@ -192,7 +200,7 @@ async function gotoSkillsHandler(
 ) {
     const [, , , targetId, authorId] = interaction.customId.split("|");
 
-    const embeds = [await getSkillsEmbed(targetId, config)];
+    const embeds = [await getSkillsEmbed(targetId, interaction)];
     const components = getComponents(true, targetId, authorId);
 
     interaction.update({
@@ -211,7 +219,7 @@ async function updateSkillsHandler(
 
     const res = await updateSkills(targetId);
 
-    const embeds = [await getSkillsEmbed(targetId, config)];
+    const embeds = [await getSkillsEmbed(targetId, interaction)];
     const components = getComponents(true, targetId, authorId);
 
     await interaction.editReply({
