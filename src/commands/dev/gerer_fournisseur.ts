@@ -97,18 +97,32 @@ async function manageProvider(
             }
 
             // Construct embed
-            provs.forEach((p: Fournisseur) => {
-                const user: DiscordUser | undefined = bot.users.cache.get(
-                    p.user_id,
-                );
-                if (!user) return;
-
-                embed.addFields({
-                    name: `${p.coordinator ? "**🔧** Coordinateur" : "Fournisseur"}`,
-                    value: `**<@${user.id}>** ||(${user.displayName})||`,
-                    inline: false,
-                });
-            });
+            embed.addFields([
+                {
+                    name: "**🔧** Coordinateurs",
+                    value: provs
+                        .filter((p) => p.coordinator)
+                        .map((p) => {
+                            const user: DiscordUser | undefined =
+                                bot.users.cache.get(p.user_id);
+                            if (!user) return "-# error";
+                            return `**<@${user.id}>**    ||(${user.displayName})||`;
+                        })
+                        .join("\n"),
+                },
+                {
+                    name: "Fournisseurs",
+                    value: provs
+                        .filter((p) => !p.coordinator)
+                        .map((p) => {
+                            const user: DiscordUser | undefined =
+                                bot.users.cache.get(p.user_id);
+                            if (!user) return "-# error";
+                            return `**<@${user.id}>**    ||(${user.displayName})||`;
+                        })
+                        .join("\n"),
+                },
+            ]);
         } else if (user) {
             // set guild member
             member = await interaction.guild!.members.fetch(user.id);
