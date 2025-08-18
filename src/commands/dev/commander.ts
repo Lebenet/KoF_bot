@@ -535,7 +535,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         .setCustomId(
             `${interaction.guildId}|commander|claimHandler|${command.id}`,
         )
-        .setLabel("Claim")
+        .setLabel("Auto-assigner")
         .setEmoji({ name: "✋" })
         .setStyle(ButtonStyle.Secondary);
 
@@ -1434,12 +1434,12 @@ module.exports = {
                 value: "\u200e",
             },
             {
-                name: "Assigner / Claim une commande:",
+                name: "Assigner / Participer à une commande:",
                 value:
                     "" +
-                    "- Les __coordinateurs__ ont la possiblité de **claim/assigner** une commande depuis un panel réservé.\n" +
+                    "- Les __coordinateurs__ ont la possiblité d'**assigner** des membres à une commande depuis un panel réservé.\n" +
                     "- Si un utilisateur est **assigné**, il sera ajouté __automatiquement__ au thread de la commande.\n" +
-                    '- **Pour pouvoir interagir avec une commande, il faut être assigné à une commande.** *(Le bouton "Claim" en-dessous du premier message du fil sert à s\'auto-assigner).*',
+                    '- **Pour pouvoir interagir avec une commande, il faut être assigné à la commande.** *(Le bouton "Auto-assigner" en-dessous du premier message du fil (épinglé) sert à cela).*',
             },
         ],
     }),
