@@ -139,6 +139,10 @@ dist
 **/data/
 /db/
 
+# api keys
+**/*credentials*.json
+*credentials*.json
+
 # temp files
 **/temp/
 processes/*

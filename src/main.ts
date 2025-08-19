@@ -22,6 +22,7 @@ import {
     MessageFlags,
     ModalSubmitInteraction,
     AutocompleteInteraction,
+    ThreadChannel,
 } from "discord.js";
 
 import { start } from "./utils/watcher";
@@ -46,6 +47,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.DirectMessages,
     ],
 });
 client.once(Events.ClientReady, (readyClient) => {
@@ -299,7 +301,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 
         // Handle
         const guildId =
-            interaction.guildId ?? (interaction.guildId = "0") /* global */;
+            interaction.guildId ?? (interaction.guildId = "0"); /* global */
         const command = getGuildCommands(guildId).get(interaction.commandName);
 
         if (!command) {
@@ -320,3 +322,26 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         return;
     }
 });
+
+// Temporary
+client.on(
+    Events.ThreadCreate,
+    async (thread: ThreadChannel, newlyCreated: boolean) => {
+        if (thread.guildId !== "888441780327055380")
+            console.log("not aimed guild");
+        else if (!newlyCreated) console.log("not newly created");
+        else if (!(thread.ownerId !== getConfig().bot.user!.id))
+            console.log("created by bot");
+        else if (thread.parentId !== "1406415907076444200")
+            console.log("not aimed thread");
+        else
+            thread
+                .fetchOwner()
+                .then((u) =>
+                    u?.user?.send(
+                        "Essayer plutôt de faire `/commander claim:Lutece` la prochaine fois !\nCa permet de mieux garder le fil :p",
+                    ),
+                )
+                .catch(console.log);
+    },
+);
