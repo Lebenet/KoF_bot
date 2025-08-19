@@ -339,7 +339,7 @@ client.on(
                 .fetchOwner()
                 .then((u) =>
                     u?.user?.send(
-                        "Essayer plutôt de faire `/commander claim:Lutece` la prochaine fois !\nCa permet de mieux garder le fil :p",
+                        "Essayez plutôt de faire `/commander claim:Lutece` la prochaine fois !\nCa permet de mieux garder le fil :p",
                     ),
                 )
                 .catch(console.log);
