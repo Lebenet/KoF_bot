@@ -34,7 +34,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
         method: "GET",
         headers: {
             "User-Agent": "Notary - lebenet on discord",
-        }
+        },
     });
     try {
         const json = await res.json();
@@ -221,7 +221,8 @@ module.exports = {
                     value: "\
 				<__player_id__> correspond à l'identifiant unique de votre compte BitCraft.\n\
 				Si vous souhaitez le connaître, allez chercher votre pseudo sur [BitJita/players](<https://bitjita.com/players>).\n\
-				L'ID sera le nombre dans le lien. (`https://bitjita.com/players/`**__<player_id>__**)",
+				L'ID sera le nombre dans le lien. (`https://bitjita.com/players/`**__<player_id>__**)\n\
+                __Exemple__: https://bitjita.com/players/**648518346352868189**",
                 },
             ],
         }),
