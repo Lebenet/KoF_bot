@@ -36,7 +36,7 @@ export const IS_NULL = Symbol("IS_NULL");
 export class Model {
     [key: string]: any;
 
-    private _inserted: boolean = false;
+    public _inserted: boolean = false;
 
     get name(): string {
         return this.constructor.name;
@@ -100,6 +100,17 @@ export class Model {
                             `[DB] Build where clause: null value for ${k} not authorised in this query.`,
                         );
                     return `${k} IS NULL`;
+                } else if (typeof v === "string" && /^\s*LIKE\s+/i.test(v)) {
+                    const pattern = v.replace(/^\s*LIKE\s+/i, "");
+                    retVals.push(pattern);
+                    return `${k} LIKE ?`;
+                } else if (
+                    typeof v === "string" &&
+                    /^\s*NOT\s+LIKE\s+/i.test(v)
+                ) {
+                    const pattern = v.replace(/^\s*NOT\s+LIKE\s+/i, "");
+                    retVals.push(pattern);
+                    return `${k} NOT LIKE ?`;
                 } else if (Model.isSafeDBValue(v)) {
                     retVals.push(Model.sanitize(v!));
                     return `${k} = ?`;
@@ -712,6 +723,29 @@ export class SettlementMember extends Model {
     public settlement_id!: number | bigint | string | null;
     public user_id!: string;
     public perm_level!: number;
+}
+
+export class LastUpdated extends Model {
+    public table_name!: string;
+    public last_updated!: Date;
+
+    override fieldTypes: Record<string, FieldType> = {
+        last_updated: "Date",
+    };
+}
+
+export class Empire extends Model {
+    public entityId!: string;
+    public e_name!: string;
+    public memberCount!: string;
+    public leader!: string;
+}
+
+export class WatchtowerStatus extends Model {
+    public guild_id!: string;
+    public channel_id!: string;
+    public message_id!: string;
+    public empire_id!: string;
 }
 
 export enum SkillKind {

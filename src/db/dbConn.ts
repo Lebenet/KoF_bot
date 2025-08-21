@@ -82,6 +82,26 @@ const tables = [
 		UNIQUE(guild_id, settlement_id, command_name, command_param)
 	);`,
 
+    `CREATE TABLE IF NOT EXISTS LastUpdateds(
+		table_name TEXT NOT NULL PRIMARY KEY,
+		last_updated DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
+	)`,
+
+    `CREATE TABLE IF NOT EXISTS Empires(
+		entityId TEXT NOT NULL PRIMARY KEY,
+		e_name TEXT NOT NULL,
+		memberCount TEXT NOT NULL,
+		leader TEXT NOT NULL
+	)`,
+
+    `CREATE TABLE IF NOT EXISTS WatchtowerStatuss(
+		guild_id TEXT NOT NULL,
+		channel_id TEXT NOT NULL,
+		message_id TEXT NOT NULL,
+		empire_id TEXT NOT NULL REFERENCES Empires(entityId) ON DELETE CASCADE,
+		PRIMARY KEY (guild_id, channel_id, empire_id)
+	)`,
+
     // DO NOT DELETE, ONLY ALTER
     `CREATE TABLE IF NOT EXISTS Professions(
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
