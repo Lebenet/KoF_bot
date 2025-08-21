@@ -9,7 +9,15 @@ import { sendCommands } from "../utils/commandLoader";
 
 export const relaodDummyDbTypes = "...";
 
-export type DbOptionsValue = number | bigint | string | boolean | Date | null;
+export type DbOptionsValue =
+    | number
+    | bigint
+    | string
+    | boolean
+    | Date
+    | null
+    | typeof IS_NOT_NULL
+    | typeof IS_NULL;
 
 export type DbOptions = {
     keys?: string[] | string | null;
@@ -22,6 +30,8 @@ export type DbOptions = {
 };
 
 export type FieldType = "string" | "bigint" | "number" | "boolean" | "Date";
+export const IS_NOT_NULL = Symbol("IS_NOT_NULL");
+export const IS_NULL = Symbol("IS_NULL");
 
 export class Model {
     [key: string]: any;
@@ -83,15 +93,16 @@ export class Model {
         str += keys
             .map((k, i) => {
                 const v = values[i];
-                if (Model.isSafeDBValue(v)) {
-                    retVals.push(Model.sanitize(v!));
-                    return `${k} = ?`;
-                } else if (v === null) {
+                if (v === IS_NOT_NULL) return `${k} IS NOT NULL`;
+                else if (v === IS_NULL || v === null) {
                     if (noNull)
                         throw new Error(
                             `[DB] Build where clause: null value for ${k} not authorised in this query.`,
                         );
                     return `${k} IS NULL`;
+                } else if (Model.isSafeDBValue(v)) {
+                    retVals.push(Model.sanitize(v!));
+                    return `${k} = ?`;
                 } else
                     throw new Error(
                         `[DB] Build where clause: unsafe value for key ${k} (${v})`,

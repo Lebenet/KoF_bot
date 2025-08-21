@@ -1,6 +1,6 @@
 import { User } from "../../db/dbTypes";
 import { TaskData } from "../../utils/taskLoader";
-import { updateSkills } from "../../utils/discordUtils";
+import { updateGsheetsSkills, updateSkills } from "../../utils/discordUtils";
 import { setTimeout } from "timers/promises";
 import { Config } from "../../utils/configLoader";
 
@@ -31,6 +31,8 @@ async function updateLinkedSkills(data: TaskData, _config: Config) {
     }
 
     console.log(`Updated skills for ${vc}/${len} linked users.`);
+    console.log("updating gsheets...");
+    await updateGsheetsSkills();
 }
 
 module.exports = {

@@ -9,11 +9,21 @@ import {
     EmbedFooterOptions,
     SlashCommandBuilder,
 } from "discord.js";
-import { Profession, Settlement, Skill, SkillKind, User } from "../db/dbTypes";
+import {
+    IS_NOT_NULL,
+    Profession,
+    Settlement,
+    Skill,
+    SkillKind,
+    User,
+} from "../db/dbTypes";
 import { getGuildCommands } from "./commandLoader";
 import { getGuildTasks } from "./taskLoader";
 import { getConfig } from "./configLoader";
 import { getParisDatetimeSQLiteSafe } from "./taskUtils";
+import path from "path";
+import { JWT } from "google-auth-library";
+import { GoogleSpreadsheet } from "google-spreadsheet";
 
 export const reloadDummyDiscordUtils = "..s.";
 
@@ -461,6 +471,119 @@ export async function updateSkills(
         message:
             "Update réussie ! La page des skills devrait maintenant être à jour.",
     };
+}
+
+const columns = ["A", "B", "C", "F", "G", "J", "K"] as const;
+
+const columnIndexes: Record<(typeof columns)[number], number> = {
+    A: 0,
+    B: 1,
+    C: 2,
+    F: 5,
+    G: 6,
+    J: 9,
+    K: 10,
+};
+
+export async function updateGsheetsSkills() {
+    const GOOGLEKEYFILEPATH = process.env.GOOGLE_CREDENTIALS_FILE!;
+    const SPREADSHEET_ID = process.env.SPREADSHEET_ID!;
+
+    console.time("pre-fetch");
+
+    // get credentials file
+    const creds = require(path.resolve(path.join("data/", GOOGLEKEYFILEPATH)));
+
+    const serviceAccountAuth = new JWT({
+        email: creds.client_email,
+        key: creds.private_key.replace(/\\n/g, "\n") || "",
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+
+    const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+
+    await doc.loadInfo();
+
+    const sheet = doc.sheetsByTitle["Répartition des rôles"];
+    if (!sheet) {
+        console.error("❌ Sheet 'Répartition des rôles' not found.");
+        return;
+    }
+
+    await sheet.loadHeaderRow();
+    const headerRow = sheet.headerValues;
+    console.timeEnd("pre-fetch");
+
+    console.time("fetch");
+    const rows = await sheet.getRows({ offset: 0, limit: 100 });
+
+    const users = User.fetchArray({ keys: "player_id", values: IS_NOT_NULL });
+    console.timeEnd("fetch");
+
+    console.time("processing");
+
+    if (!rows.length) {
+        console.log("No data found.");
+        return;
+    }
+
+    await sheet.loadCells(); // Load entire sheet or scoped range
+
+    const selectedHeaders = columns.map((col) => headerRow[columnIndexes[col]]);
+    // const finalOutput: Record<string, Record<string, string>> = {};
+
+    let updates = 0;
+
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        const row = rows[rowIndex];
+
+        const key = row.get(selectedHeaders[0]) || "Unnamed";
+        const user = users.find((u) => u.player_username === key);
+        if (!user) continue;
+        console.log(`updating for user ${user.player_username}`);
+
+        const nestedObject: Record<string, string> = {};
+
+        for (let i = 1; i < columns.length; i++) {
+            const header = selectedHeaders[i];
+            nestedObject[header] = row.get(header) || "";
+        }
+
+        // finalOutput[key] = nestedObject;
+
+        const skills = [
+            nestedObject.Primaire,
+            nestedObject.Secondaire,
+            nestedObject.Bonus,
+        ];
+        const pnames = Profession.fetchArray().map((p) => p.p_name);
+
+        // Now handle batch update logic
+        skills.forEach((sk, i) => {
+            if (pnames.includes(sk)) {
+                console.log(`  - updating skill ${sk}`);
+                const colIndex = headerRow.indexOf(`LvL${i + 1}`);
+                if (colIndex === -1) return;
+
+                const cell = sheet.getCell(rowIndex + 1, colIndex); // +1 to skip header row
+                const skill = Skill.get({
+                    keys: ["user_id", "profession_name"],
+                    values: [user.id, sk],
+                });
+                if (skill && cell.value != skill.level) {
+                    console.log(
+                        `    - xp diff, updating (new lvl: ${skill.level})`,
+                    );
+                    cell.value = skill.level;
+                    updates++;
+                }
+            }
+        });
+    }
+
+    await sheet.saveUpdatedCells();
+    console.log(`Updates:${updates}`);
+    console.timeEnd("processing");
 }
 
 const _emojisSkillsMap = new Map<string, string>();
