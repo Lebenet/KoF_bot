@@ -29,6 +29,8 @@ import {
     UserSelectMenuInteraction,
     Message,
     MessageType,
+    TextThreadChannel,
+    ForumThreadChannel,
 } from "discord.js";
 
 import { Config } from "../../utils/configLoader";
@@ -190,7 +192,7 @@ async function initHandler(
         return;
     }
 
-    const channel = config.bot.channels.cache.get(chan.channel_id) as
+    const channel = (await config.bot.channels.fetch(chan.channel_id)) as
         | TextChannel
         | ForumChannel;
     if (!channel) {
@@ -464,9 +466,9 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
     );
     if (!panel) throw new Error("Something went wrong.");
 
-    const panelMessage = (
-        config.bot.channels.cache.get(panel.channel_id) as TextChannel
-    ).messages.cache.get(command.panel_message_id ?? "-1");
+    const panelMessage = await (
+        (await config.bot.channels.fetch(panel.channel_id)) as TextChannel
+    ).messages.fetch(command.panel_message_id ?? "-1");
     if (panelMessage) {
         const embeds = [
             EmbedBuilder.from(panelMessage.embeds[0])
@@ -560,7 +562,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     );
     if (!ppanel) throw new Error("Something went wrong.");
 
-    const panel = config.bot.channels.cache.get(ppanel.channel_id) as
+    const panel = (await config.bot.channels.fetch(ppanel.channel_id)) as
         | TextChannel
         | undefined;
     if (!panel) {
@@ -676,11 +678,11 @@ async function assignHandler(
     }
 
     const users = interaction.users;
-    const thread = (
-        config.bot.channels.cache.get(chan.channel_id) as
+    const thread = await (
+        (await config.bot.channels.fetch(chan.channel_id)) as
             | ForumChannel
             | TextChannel
-    ).threads.cache.get(command.thread_id);
+    ).threads.fetch(command.thread_id);
     if (!thread) {
         interaction
             .editReply("Le thread de la commande a été supprimé !")
@@ -765,11 +767,11 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             return;
         }
 
-        panelMsg = (
-            config.bot.channels.cache.get(panel.channel_id) as
+        panelMsg = (await (
+            (await config.bot.channels.fetch(panel.channel_id)) as
                 | TextChannel
                 | undefined
-        )?.messages.cache.get(command.panel_message_id!) as Message | undefined;
+        )?.messages.fetch(command.panel_message_id!)) as Message | undefined;
 
         if (!panelMsg) {
             await interaction.followUp(
@@ -793,18 +795,20 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             return;
         }
 
-        thread = (
-            config.bot.channels.cache.get(chan.channel_id) as
+        thread = (await (
+            (await config.bot.channels.fetch(chan.channel_id)) as
                 | ForumChannel
                 | TextChannel
-        ).threads.cache.get(command.thread_id);
+        ).threads.fetch(command.thread_id)) as
+            | ForumThreadChannel
+            | TextThreadChannel;
         if (!thread) {
             await interaction.editReply(
                 "Il faut setup le bot! Faut faire `/setup_commandes` ou contacter un admin.",
             );
             return;
         }
-        panelMsg = interaction.channel!.messages.cache.get(
+        panelMsg = await interaction.channel!.messages.fetch(
             command.panel_message_id!,
         )!;
 
@@ -989,7 +993,7 @@ async function updatePanel(command: Command, config: Config) {
         "panel_channel_id",
         command.settlement_id,
     );
-    const panel = config.bot.channels.cache.get(panelParam?.channel_id!) as
+    const panel = (await config.bot.channels.fetch(panelParam?.channel_id!)) as
         | TextChannel
         | undefined;
     if (!panel) return;
@@ -1037,7 +1041,7 @@ async function addItemsHandler(
     }
 
     const thread = await (
-        config.bot.channels.cache.get(channel.channel_id) as
+        (await config.bot.channels.fetch(channel.channel_id)) as
             | TextChannel
             | ForumChannel
     ).threads.fetch(command.thread_id);
@@ -1169,12 +1173,14 @@ async function updateItem(
         command.settlement_id,
     );
     if (!param) return;
-    const threadSrc = config.bot.channels.cache.get(param.channel_id) as
+    const threadSrc = (await config.bot.channels.fetch(param.channel_id)) as
         | TextChannel
         | ForumChannel
         | undefined;
     if (!threadSrc) return;
-    thread = threadSrc.threads.cache.get(command.thread_id);
+    thread = (await threadSrc.threads.fetch(command.thread_id)) as
+        | ForumThreadChannel
+        | TextThreadChannel;
     if (!thread) return;
 
     if (!message) message = await thread.messages.fetch(item.message_id!);

@@ -31,7 +31,7 @@ async function setupCommands(
     let channel: TFChannel;
 
     if (!channelRaw) {
-        const fetched = bot.channels.cache.get(interaction.channelId);
+        const fetched = await bot.channels.fetch(interaction.channelId);
 
         if (
             fetched &&
