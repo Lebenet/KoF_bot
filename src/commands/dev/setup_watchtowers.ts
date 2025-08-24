@@ -72,7 +72,7 @@ async function setupWatchtowers(
     ws.empire_id = empId;
 
     const msg = await chan.send({
-        content: "test",
+        content: "-# awaiting update, please do not delete...",
     });
     ws.message_id = msg.id;
 
@@ -86,13 +86,13 @@ async function setupWatchtowers(
 }
 
 async function getEmpires(curr: string): Promise<Empire[]> {
-    console.log("getting empires +++", curr);
+    // console.log("getting empires +++", curr);
 
     const lu = new LastUpdated();
     lu.table_name = "Empires";
     if (!lu.sync()) lu.last_updated = new Date(0);
 
-    if (lu.last_updated.getTime() + 60_000 * 60_000 < Date.now()) {
+    if (lu.last_updated.getTime() + 15_000 * 60_000 < Date.now()) {
         console.time("fetching empires");
         const resRaw = await fetch(`https://bitjita.com/api/empires`, {
             method: "GET",

@@ -11,7 +11,7 @@ if (!globalThis.__db) {
         nativeBinding:
             "../node_modules/better-sqlite3/build/Release/better_sqlite3.node",
     });
-    db.pragma("journal_mode = WAL");
+    //db.pragma("journal_mode = WAL");
 
     globalThis.__db = db;
 
@@ -82,6 +82,7 @@ const tables = [
 		UNIQUE(guild_id, settlement_id, command_name, command_param)
 	);`,
 
+    //`DROP TABLE IF EXISTS LastUpdateds`,
     `CREATE TABLE IF NOT EXISTS LastUpdateds(
 		table_name TEXT NOT NULL PRIMARY KEY,
 		last_updated DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))

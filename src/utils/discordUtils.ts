@@ -274,13 +274,15 @@ function globalEmbedFactory(embedType: EmbedType, color: number): EmbedBuilder {
         });
     }
 
-    if (embedType.author) {
-        embed.setAuthor(embedType.author);
-    } else {
-        embed.setAuthor({
-            name: client.displayName,
-            iconURL: client.avatarURL()!,
-        });
+    if (embedType.author !== null) {
+        if (embedType.author) {
+            embed.setAuthor(embedType.author);
+        } else {
+            embed.setAuthor({
+                name: client.displayName,
+                iconURL: client.avatarURL()!,
+            });
+        }
     }
 
     if (embedType.timestamp) {
@@ -328,8 +330,8 @@ export type EmbedType = {
     description?: string;
     fields?: APIEmbedField[];
     footer?: EmbedFooterOptions;
-    author?: EmbedAuthorOptions;
-    timestamp?: boolean | Date;
+    author?: EmbedAuthorOptions | null;
+    timestamp?: boolean | number | Date;
     thumbnail?: string;
     image?: string;
 };
@@ -540,7 +542,6 @@ export async function updateGsheetsSkills() {
         const key = row.get(selectedHeaders[0]) || "Unnamed";
         const user = users.find((u) => u.player_username === key);
         if (!user) continue;
-        console.log(`updating for user ${user.player_username}`);
 
         const nestedObject: Record<string, string> = {};
 
@@ -558,10 +559,11 @@ export async function updateGsheetsSkills() {
         ];
         const pnames = Profession.fetchArray().map((p) => p.p_name);
 
+        let str: string = "";
         // Now handle batch update logic
         skills.forEach((sk, i) => {
             if (pnames.includes(sk)) {
-                console.log(`  - updating skill ${sk}`);
+                str += `\n  - updating skill ${sk}`;
                 const colIndex = headerRow.indexOf(`LvL${i + 1}`);
                 if (colIndex === -1) return;
 
@@ -571,14 +573,14 @@ export async function updateGsheetsSkills() {
                     values: [user.id, sk],
                 });
                 if (skill && cell.value != skill.level) {
-                    console.log(
-                        `    - xp diff, updating (new lvl: ${skill.level})`,
-                    );
+                    str += `\n  - updating skill ${sk}\n    - xp diff, updating (new lvl: ${skill.level})`;
                     cell.value = skill.level;
                     updates++;
                 }
             }
         });
+
+        if (str) console.log(`updating for user ${user.player_username}` + str);
     }
 
     await sheet.saveUpdatedCells();

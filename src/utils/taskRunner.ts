@@ -33,7 +33,6 @@ async function runTask(task: Task) {
         task.data.running = true;
 
         await task.run(task.data, config);
-        task.data.running = false;
 
         // Handle repeated tasks
         if (task.data.repeats && task.data.repeats > 1) {
@@ -47,6 +46,7 @@ async function runTask(task: Task) {
             err,
         );
     }
+    task.data.running = false;
 
     try {
         if (task.data.activated)
