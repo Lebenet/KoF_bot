@@ -4,7 +4,7 @@ import { Config } from "../../utils/configLoader";
 import { TaskData } from "../../utils/taskLoader";
 import { dangerEmbed, primaryEmbed } from "../../utils/discordUtils";
 
-type Siege = {
+type Attacker = {
     active: boolean;
     energy: number;
     startTimestamp: null | string;
@@ -12,6 +12,24 @@ type Siege = {
     empireName: string; // Empire.e_name
     attacker: boolean;
 };
+
+type Defender = {
+    active: boolean;
+    energy: number;
+    startTimestamp: null | string;
+    empireEntityId: number; // Empire.entityId
+    attacker: undefined | boolean;
+};
+
+type Siege = Attacker | Defender;
+
+function isAttacker(s: Siege): Attacker | undefined {
+    return s.attacker ? (s as Attacker) : undefined;
+}
+
+function isDefender(s: Siege): Defender | undefined {
+    return !s.attacker ? (s as Defender) : undefined;
+}
 
 type Watchtower = {
     entityId: string;
@@ -89,10 +107,20 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
     const timestampLen = timestamp.toString().length;
 
     const fields: APIEmbedField[][] = [];
-    const mkStr = (wt: Watchtower, siege?: Siege) =>
-        siege
-            ? `**${wt.energy}** / **${siege.energy}**: *${wt.nickname} __VS__ ${siege.empireName}*`
-            : (wt.active ? "" : "-# ") + `**${wt.energy}**: *${wt.nickname}*`;
+    const mkStr = (wt: Watchtower, sieges: Siege[] = []) => {
+        if (sieges.length !== 0) {
+            sieges = sieges.slice(0, 2);
+            let attacker = isAttacker(sieges[0]);
+            if (!attacker && sieges.length > 1)
+                attacker = isAttacker(sieges[1]);
+            let defender = isDefender(sieges[0]);
+            if (!defender && sieges.length > 1)
+                defender = isDefender(sieges[1]);
+            if (attacker)
+                return `**${defender ? defender.energy : wt.energy}** / **${attacker.energy}**: *${wt.nickname} __VS__ ${attacker.empireName}*`;
+        }
+        return (wt.active ? "" : "-# ") + `**${wt.energy}**: *${wt.nickname}*`;
+    };
 
     // Build groups
     chunkCategory(
@@ -100,7 +128,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
         sieged.map((wt) =>
             mkStr(
                 wt,
-                wt.siege.find((s) => s.active),
+                wt.siege.filter((s) => s.active),
             ),
         ),
         fields,
