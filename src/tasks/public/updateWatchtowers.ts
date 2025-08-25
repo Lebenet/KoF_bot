@@ -116,8 +116,23 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
             let defender = isDefender(sieges[0]);
             if (!defender && sieges.length > 1)
                 defender = isDefender(sieges[1]);
-            if (attacker)
-                return `**${(defender ? defender.energy : 0) + wt.energy}** / **${attacker.energy}**: [X: ${wt.locationX}, Z: ${wt.locationZ}]\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Siege commencé <t:${new Date(attacker?.startTimestamp ?? defender?.startTimestamp ?? "0").getTime()}:R>`;
+            if (attacker) {
+                console.log(
+                    attacker?.startTimestamp,
+                    defender?.startTimestamp,
+                    new Date(
+                        attacker?.startTimestamp ??
+                            defender?.startTimestamp ??
+                            "0",
+                    ).getTime(),
+                    new Date(
+                        attacker?.startTimestamp ??
+                            defender?.startTimestamp ??
+                            "0",
+                    ),
+                );
+                return `**${(defender ? defender.energy : 0) + wt.energy}** / **${attacker.energy}**: [X: ${wt.locationX}, Z: ${wt.locationZ}]\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Siege commencé <t:${Math.round(new Date(attacker?.startTimestamp ?? defender?.startTimestamp ?? "0").getTime() / 1000)}:R>`;
+            }
         }
         return wt.active
             ? `**${wt.energy}**: [X: ${wt.locationX}, Z: ${wt.locationZ}]\n- *${wt.nickname}*`
