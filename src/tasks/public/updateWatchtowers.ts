@@ -131,7 +131,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
                             "0",
                     ),
                 );
-                return `**${(defender ? defender.energy : 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${wt.locationX}, **Z**: ${wt.locationZ}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Siege commencé <t:${Math.round(new Date(attacker?.startTimestamp ?? defender?.startTimestamp ?? "0").getTime() / 1000)}:f>`;
+                return `**${(defender ? defender.energy : 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${Math.round(wt.locationX / 3)}, **Z**: ${Math.round(wt.locationZ / 3)}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Siege commencé <t:${Math.round(new Date(attacker?.startTimestamp ?? defender?.startTimestamp ?? "0").getTime() / 1000)}:f>`;
             }
         }
         return wt.active
