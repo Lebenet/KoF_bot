@@ -135,7 +135,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
             }
         }
         return wt.active
-            ? `**${wt.energy}**: -${wt.upkeep}/h`
+            ? `**${wt.energy}**:    -${wt.upkeep}/h\n- *${wt.nickname}*`
             : `-# **${wt.energy}**: *${wt.nickname}*`;
     };
 
