@@ -117,9 +117,11 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
             if (!defender && sieges.length > 1)
                 defender = isDefender(sieges[1]);
             if (attacker)
-                return `**${defender ? defender.energy : wt.energy}** / **${attacker.energy}**: *${wt.nickname} __VS__ ${attacker.empireName}*`;
+                return `**${(defender ? defender.energy : 0) + wt.energy}** / **${attacker.energy}**: [${wt.locationX}, ${wt.locationZ}]\n *${wt.nickname} __VS__ ${attacker.empireName}*\n-# Siege commencé <t:${new Date(attacker?.startTimestamp ?? defender?.startTimestamp ?? NaN).getTime()}:R>`;
         }
-        return (wt.active ? "" : "-# ") + `**${wt.energy}**: *${wt.nickname}*`;
+        return wt.active
+            ? `**${wt.energy}**: [${wt.locationX}, ${wt.locationZ}]\n-# *${wt.nickname}*`
+            : `-# **${wt.energy}**: *${wt.nickname}*`;
     };
 
     // Build groups
