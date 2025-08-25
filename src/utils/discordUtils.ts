@@ -563,7 +563,6 @@ export async function updateGsheetsSkills() {
         // Now handle batch update logic
         skills.forEach((sk, i) => {
             if (pnames.includes(sk)) {
-                str += `\n  - updating skill ${sk}`;
                 const colIndex = headerRow.indexOf(`LvL${i + 1}`);
                 if (colIndex === -1) return;
 

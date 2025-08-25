@@ -38,24 +38,12 @@ async function updateLinkedSkills(data: TaskData, _config: Config) {
 module.exports = {
     data: {
         name: "Update Skills for Linked Users",
-        interval: 60, // interval in minutes
-        time: null, // tod to activate it, format "HH:MM" (can be an array)
-        // if neither interval nor time is provided, task can only be run once if runOnStart is set to true
-        autoStart: true, // task will auto activate on every bot startup if true
-        runOnStart: true, // run once on bot startup (counts for repeats, also counts as autoStart)
-        repeat: 0, // 0 means infinite, once all repetitions are done, will need to be manually reactivated
-        notResetOnReload: true, // Not reset timestamp when the task is reloaded
-
-        /* Added fields by loader and runner (useless/wrong unless mentionned otherwise):
-			// Usable
-			guildId?: string; // id of the guild this task is executed for
-			repeats?: number; // How many times the task will be executed (0 | undefined = infinite, can be used here)
-
-			// Useless
-			activated: boolean; // Whether or not the task is currently activated
-			nextTimestamp: number; // When the task will be next executed
-			running?: boolean; // To ensure long-lasting tasks don't get activated twice
-		*/
+        interval: 60,
+        time: null,
+        autoStart: true,
+        runOnStart: true,
+        repeat: 0,
+        notResetOnReload: true,
     },
     run: updateLinkedSkills,
 };
