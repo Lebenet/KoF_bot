@@ -17,7 +17,7 @@ if (!globalThis.__db) {
 
     process.on("exit", () => {
         try {
-            db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
+            // db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
         } catch (err) {
             console.error("Checkpoint failed on exit:", err);
         }
@@ -25,7 +25,7 @@ if (!globalThis.__db) {
     });
     process.on("SIGINT", () => {
         try {
-            db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
+            // db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
         } catch (err) {
             console.error("Checkpoint failed on exit:", err);
         }
@@ -82,18 +82,42 @@ const tables = [
 		UNIQUE(guild_id, settlement_id, command_name, command_param)
 	);`,
 
-    //`DROP TABLE IF EXISTS LastUpdateds`,
+    // `DROP TABLE IF EXISTS LastUpdateds`,
     `CREATE TABLE IF NOT EXISTS LastUpdateds(
 		table_name TEXT NOT NULL PRIMARY KEY,
 		last_updated DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
-	)`,
+	);`,
 
     `CREATE TABLE IF NOT EXISTS Empires(
 		entityId TEXT NOT NULL PRIMARY KEY,
 		e_name TEXT NOT NULL,
 		memberCount TEXT NOT NULL,
 		leader TEXT NOT NULL
-	)`,
+	);`,
+
+    // `DROP TABLE IF EXISTS SharedCraftsStatuss`,
+    `CREATE TABLE IF NOT EXISTS SharedCraftsStatuss(
+		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		guild_id TEXT NOT NULL,
+		channel_id TEXT NOT NULL,
+		claim_id TEXT NOT NULL,
+		UNIQUE (guild_id, channel_id, claim_id)
+	);`,
+
+    // `DROP TABLE IF EXISTS SharedCrafts`,
+    `CREATE TABLE IF NOT EXISTS SharedCrafts(
+		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		message_id TEXT NOT NULL,
+		entityId TEXT NOT NULL,
+		status_id INTEGER NOT NULL REFERENCES SharedCraftsStatuss(id),
+		item_name TEXT NOT NULL,
+		crafting_station TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'In Progress',
+		claim_name TEXT NOT NULL,
+		progress INTEGER NOT NULL,
+		total INTEGER NOT NULL,
+		owner_name TEXT NOT NULL
+	);`,
 
     `CREATE TABLE IF NOT EXISTS WatchtowerStatuss(
 		guild_id TEXT NOT NULL,
@@ -101,7 +125,7 @@ const tables = [
 		message_id TEXT NOT NULL,
 		empire_id TEXT NOT NULL REFERENCES Empires(entityId) ON DELETE CASCADE,
 		PRIMARY KEY (guild_id, channel_id, empire_id)
-	)`,
+	);`,
 
     // DO NOT DELETE, ONLY ALTER
     `CREATE TABLE IF NOT EXISTS Professions(

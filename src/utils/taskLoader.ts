@@ -185,9 +185,8 @@ export function loadTask(file: string, dir: string) {
     try {
         // Get current loaded task (if it exists)
         const currTask = require.cache[require.resolve(filePath)];
-        const nreset: boolean = currTask?.exports.data.notResetOnReload
-            ? true
-            : false;
+        const nreset: boolean =
+            currTask?.exports?.data?.notResetOnReload ?? false;
         if (currTask) unloadTask(file, filePath, targetMap);
 
         // Load task to require memory

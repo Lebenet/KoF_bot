@@ -372,7 +372,6 @@ export class Model {
                     db.prepare("SELECT last_insert_rowid()").get() as any
                 )["last_insert_rowid()"];
             }
-
             return res.changes === 1 ? this : undefined;
         } catch (err) {
             console.error(`[DB] Insert: something went wrong\n`, err);
@@ -746,6 +745,27 @@ export class WatchtowerStatus extends Model {
     public channel_id!: string;
     public message_id!: string;
     public empire_id!: string;
+}
+
+export class SharedCraftsStatus extends Model {
+    public id!: number;
+    public guild_id!: string;
+    public channel_id!: string;
+    public claim_id!: string;
+}
+
+export class SharedCraft extends Model {
+    public id!: number;
+    public message_id!: string;
+    public entityId!: string;
+    public status_id!: number;
+    public item_name!: string;
+    public crafting_station!: string;
+    public status!: string;
+    public claim_name!: string;
+    public progress!: number;
+    public total!: number;
+    public owner_name!: string;
 }
 
 export enum SkillKind {

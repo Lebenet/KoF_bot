@@ -116,26 +116,36 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
             let defender = isDefender(sieges[0]);
             if (!defender && sieges.length > 1)
                 defender = isDefender(sieges[1]);
+
             if (attacker) {
-                console.log(
-                    attacker?.startTimestamp,
-                    defender?.startTimestamp,
+                const start = Math.round(
                     new Date(
                         attacker?.startTimestamp ??
                             defender?.startTimestamp ??
-                            "0",
-                    ).getTime(),
-                    new Date(
-                        attacker?.startTimestamp ??
-                            defender?.startTimestamp ??
-                            "0",
-                    ),
+                            Date.now(),
+                    ).getTime() / 1000,
                 );
-                return `**${(defender ? defender.energy : 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${Math.round(wt.locationX / 3)}, **Z**: ${Math.round(wt.locationZ / 3)}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Siege commencé <t:${Math.round(new Date(attacker?.startTimestamp ?? defender?.startTimestamp ?? "0").getTime() / 1000)}:f>`;
+                const nowSecs = Math.round(Date.now() / 1000);
+
+                const ticks = Math.round((nowSecs - start) / 60 / 10);
+                const remainingTicks = (e: number, ticks: number) =>
+                    -(ticks + 1) +
+                    (1 / 3) * Math.sqrt(9 * (ticks + 1) * (ticks + 1) + 24 * e);
+
+                const attackerRemainingSeconds = Math.round(
+                    remainingTicks(attacker.energy, ticks) * 10 * 60,
+                );
+                const defenderRemainingSeconds = Math.round(
+                    remainingTicks(wt.energy + (defender?.energy ?? 0), ticks) *
+                        10 *
+                        60,
+                );
+
+                return `**${(defender?.energy ?? 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${Math.round(wt.locationX / 3)}, **Z**: ${Math.round(wt.locationZ / 3)}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Attaque vide dans approx.: <t:${nowSecs + attackerRemainingSeconds}:f>\n-# Defense vide dans approx.: <t:${nowSecs + defenderRemainingSeconds}:f>\n-# Siege commencé <t:${start}:f>`;
             }
         }
         return wt.active
-            ? `**${wt.energy}**:    -${wt.upkeep}/h\n- *${wt.nickname}*`
+            ? `**${wt.energy}**:    -${wt.upkeep * 24}/j\n- *${wt.nickname}*`
             : `-# **${wt.energy}**: *${wt.nickname}*`;
     };
 
