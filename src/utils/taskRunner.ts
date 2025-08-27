@@ -1,6 +1,6 @@
 import { computeNextTimestamp, getParisDatetimeSQLiteSafe } from "./taskUtils";
 import { getTasks, deactivateTask, Task } from "./taskLoader";
-import { getConfig } from "./configLoader";
+import { Config, getConfig } from "./configLoader";
 
 export const reloadDummyTaskRunner = "...";
 
@@ -20,7 +20,7 @@ export function stopTaskRunner() {
     intervalId = null;
 }
 
-async function runTask(task: Task) {
+async function runTask(task: Task, config: Config) {
     if (task.data.running) {
         console.log(
             `[TASK] Task ${task.data.name} is already running, skipping.`,
@@ -29,7 +29,6 @@ async function runTask(task: Task) {
     }
 
     try {
-        const config = getConfig();
         task.data.running = true;
 
         await task.run(task.data, config);
@@ -73,6 +72,10 @@ async function runTask(task: Task) {
 
 async function checker() {
     if (!intervalId) return;
+
+    const config = getConfig();
+    if (config.locked) return;
+
     const allTasks = getTasks();
 
     for (const [, tasks] of Object.entries(allTasks)) {
@@ -91,7 +94,7 @@ async function checker() {
             ) {
                 // console.log(now.getHours() + ":" + now.getMinutes());
                 console.log(`[INFO] Running task: ${task.data.name}`);
-                runTask(task);
+                runTask(task, config);
             }
         }
     }
