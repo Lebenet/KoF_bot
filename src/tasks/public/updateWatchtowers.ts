@@ -141,7 +141,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
                         60,
                 );
 
-                return `**${(defender?.energy ?? 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${Math.round(wt.locationX / 3)}, **Z**: ${Math.round(wt.locationZ / 3)}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Attaque vide: approx. <t:${nowSecs + attackerRemainingSeconds}:f>\n-# Defense vide: approx. <t:${nowSecs + defenderRemainingSeconds}:f>\n-# Siege commencé <t:${start}:f>`;
+                return `**${(defender?.energy ?? 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${Math.round(wt.locationX / 3)}, **Z**: ${Math.round(wt.locationZ / 3)}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Attaque vide: approx. <t:${nowSecs + attackerRemainingSeconds}:f> <t:${nowSecs + attackerRemainingSeconds}:R>\n-# Defense vide: approx. <t:${nowSecs + defenderRemainingSeconds}:f> <t:${nowSecs + defenderRemainingSeconds}:R>\n-# Siege commencé <t:${start}:f>`;
             }
         }
         return wt.active
