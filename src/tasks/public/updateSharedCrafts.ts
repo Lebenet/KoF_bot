@@ -1,5 +1,5 @@
 import { ChannelManager, ChannelType, EmbedBuilder, Message } from "discord.js";
-import { SharedCraft, SharedCraftsStatus } from "../../db/dbTypes";
+import { Profession, SharedCraft, SharedCraftsStatus } from "../../db/dbTypes";
 import { Config } from "../../utils/configLoader";
 import { TaskData, TaskDataLoad } from "../../utils/taskLoader";
 import { shortenText } from "../../utils/discordUtils";
@@ -60,11 +60,25 @@ type Request = {
     claims: { entityId: string; name: string }[];
 };
 
-function getCraftEmbed(craft: SharedCraft) {
+function getCraftEmbed(craft: SharedCraft, skills: LevelRequirements[]) {
     const progress: number = craft.progress / craft.total;
+    const sksf: string = skills
+        .map((sk) => {
+            const prof = Profession.get({
+                keys: "skill_id",
+                values: sk.skill_id,
+            });
+            if (!prof) return null;
+            return `${prof.p_name} nv. ${sk.level}`;
+        })
+        .filter((sk) => sk !== null)
+        .join(", ");
+
     return new EmbedBuilder()
         .setTitle(shortenText(craft.item_name, 256))
-        .setDescription(`__building__: **${craft.crafting_station}**`)
+        .setDescription(
+            `__**skill(s)**__: ${sksf}\n__**building**__: ${craft.crafting_station}`,
+        )
         .setAuthor({
             name: shortenText(craft.owner_name ?? "author not found", 256),
         })
@@ -165,7 +179,7 @@ async function update(_data: TaskData, config: Config) {
                 .edit({
                     //content: dbcraft.status,
                     content: "",
-                    embeds: [getCraftEmbed(dbcraft)],
+                    embeds: [getCraftEmbed(dbcraft, craft.levelRequirements)],
                     //components: [],
                 })
                 .catch();

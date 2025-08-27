@@ -602,6 +602,7 @@ export class Profession extends Model {
     public kind!: string;
     public description!: string;
     public emoji!: string;
+    public skill_id!: number;
 
     public toString(): string {
         return this.p_name;
@@ -780,103 +781,116 @@ export enum SkillKind {
 
 // Add professions
 export function changeProfs() {
-    for (const [n, k, d, e] of [
+    for (const [n, k, d, e, s] of [
         [
             "Forestry",
             SkillKind.Gather,
             "Bûcheron",
             "<:skill_forestry:1400969700925771787>",
+            2,
         ],
         [
             "Carpentry",
             SkillKind.Refine,
             "Charpentier",
             "<:skill_carpentry:1400969531857309726>",
+            3,
         ],
         [
             "Masonry",
             SkillKind.Refine,
             "Maçon",
             "<:skill_masonry:1400969755904442569>",
+            4,
         ],
         [
             "Mining",
             SkillKind.Gather,
             "Mineur",
             "<:skill_mining:1400969776494542888>",
+            5,
         ],
         [
             "Smithing",
             SkillKind.Refine,
             "Forgeron",
             "<:skill_smithing:1400969823516753920>",
+            6,
         ],
         [
             "Scholar",
             SkillKind.Refine,
             "Savant",
             "<:skill_scholar:1400969804977799168>",
+            7,
         ],
         [
             "Leatherworking",
             SkillKind.Refine,
             "Tanneur",
             "<:skill_leatherworking:1400969735029526608>",
+            8,
         ],
         [
             "Hunting",
             SkillKind.Gather,
             "Chasseur",
             "<:skill_hunting:1400969717371375796>",
+            9,
         ],
         [
             "Tailoring",
             SkillKind.Refine,
             "Tisserand",
             "<:skill_tailoring:1400969842479071354>",
+            10,
         ],
         [
             "Farming",
             SkillKind.Refine,
             "Fermier",
             "<:skill_farming:1400969632772259890>",
+            11,
         ],
         [
             "Fishing",
             SkillKind.Gather,
             "Pêcheur",
             "<:skill_fishing:1400969663763972157>",
+            12,
         ],
         [
             "Cooking",
             SkillKind.Skill,
             "Cuistot",
             "<:skill_cooking:1400969611943350272>",
+            13,
         ],
         [
             "Foraging",
             SkillKind.Gather,
             "Ceuilleur",
             "<:skill_foraging:1400969681640226967>",
+            14,
         ],
-        ["Construction", SkillKind.Skill, "Construction", "🛠️"],
-        ["Taming", SkillKind.Skill, "Eleveur", "🐑"],
-        ["Slayer", SkillKind.Skill, "Massacreur", "☠️"],
-        ["Merchanting", SkillKind.Skill, "Marchand", "💰"],
-        ["Sailing", SkillKind.Skill, "Navigateur", "⛵"],
+        ["Construction", SkillKind.Skill, "Construction", "🛠️", 15],
+        ["Taming", SkillKind.Skill, "Eleveur", "🐑", 17],
+        ["Slayer", SkillKind.Skill, "Massacreur", "☠️", 18],
+        ["Merchanting", SkillKind.Skill, "Marchand", "💰", 19],
+        ["Sailing", SkillKind.Skill, "Navigateur", "⛵", 21],
     ]) {
         db.prepare(
             `
-            INSERT INTO Professions(p_name, kind, description, emoji)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO Professions(p_name, kind, description, emoji, skill_id)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(p_name) DO NOTHING;
         `,
-        ).run(n, k, d, e);
+        ).run(n, k, d, e, s);
         db.prepare(
             `UPDATE Professions 
-            SET kind = ?, description = ?, emoji = ?
+            SET kind = ?, description = ?, emoji = ?, skill_id = ?
             WHERE p_name = ?;`,
-        ).run(k, d, e, n);
+        ).run(k, d, e, s, n);
     }
 }
 

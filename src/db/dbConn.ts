@@ -128,7 +128,8 @@ const tables = [
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
 		kind TEXT NOT NULL DEFAULT 'unknown',
 		description TEXT NOT NULL,
-		emoji TEXT NOT NULL DEFAULT "⁉️"
+		emoji TEXT NOT NULL DEFAULT "⁉️",
+		skill_id INTEGER NOT NULL DEFAULT 0
 	);`,
     `CREATE TABLE IF NOT EXISTS Fournisseurs (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
