@@ -1,4 +1,10 @@
-import { ChannelManager, ChannelType, EmbedBuilder, Message } from "discord.js";
+import {
+    ChannelManager,
+    ChannelType,
+    EmbedBuilder,
+    HexColorString,
+    Message,
+} from "discord.js";
 import { Profession, SharedCraft, SharedCraftsStatus } from "../../db/dbTypes";
 import { Config } from "../../utils/configLoader";
 import { TaskData, TaskDataLoad } from "../../utils/taskLoader";
@@ -60,22 +66,45 @@ type Request = {
     claims: { entityId: string; name: string }[];
 };
 
-function getCraftEmbed(craft: SharedCraft, skills: LevelRequirements[]) {
+const colors = new Map<number, HexColorString>([
+    [1, `#${"636a74"}`],
+    [2, `#${"875f45"}`],
+    [3, `#${"5c6f4d"}`],
+    [4, `#${"49619c"}`],
+    [5, `#${"814f87"}`],
+    [6, `#${"983a44"}`],
+    [7, `#${"947014"}`],
+    [8, `#${"538484"}`],
+    [9, `#${"464953"}`],
+    [10, `#${"97afbf"}`],
+]);
+
+function getCraftEmbed(
+    craft: SharedCraft,
+    tier: number,
+    skills: LevelRequirements[],
+) {
     const progress: number = craft.progress / craft.total;
+    const profs = skills.map((sk) =>
+        Profession.get({
+            keys: "skill_id",
+            values: sk.skill_id,
+        }),
+    );
+
+    let em: string | undefined;
     const sksf: string = skills
-        .map((sk) => {
-            const prof = Profession.get({
-                keys: "skill_id",
-                values: sk.skill_id,
-            });
+        .map((sk, i) => {
+            const prof = profs[i];
             if (!prof) return null;
+            if (!em) em = prof.emoji;
             return `${prof.p_name} nv. ${sk.level}`;
         })
         .filter((sk) => sk !== null)
         .join(", ");
 
     return new EmbedBuilder()
-        .setTitle(shortenText(craft.item_name, 256))
+        .setTitle(shortenText(em + " " + craft.item_name, 256))
         .setDescription(
             `__**skill(s)**__: ${sksf}\n__**building**__: ${craft.crafting_station}`,
         )
@@ -91,6 +120,7 @@ function getCraftEmbed(craft: SharedCraft, skills: LevelRequirements[]) {
                     "▫️".repeat(Math.round((1 - progress) * 20)),
             },
         ])
+        .setColor(colors.get(tier) ?? null)
         .setFooter({ text: "Dernière update" })
         .setTimestamp();
 }
@@ -121,9 +151,9 @@ async function update(_data: TaskData, config: Config) {
             values: status.id,
         }).forEach((sc) => existing.set(sc.entityId, sc));
 
-        const items: Map<number, Item> = new Map(
-            req.items.map((i) => [i.id, i]),
-        );
+        const items = new Map<number, Item>();
+        req.cargos.forEach((c) => items.set(c.id, c));
+        req.items.forEach((i) => items.set(i.id, i));
 
         let c: number = 0;
         const promises = req.craftResults.map(async (craft) => {
@@ -179,7 +209,13 @@ async function update(_data: TaskData, config: Config) {
                 .edit({
                     //content: dbcraft.status,
                     content: "",
-                    embeds: [getCraftEmbed(dbcraft, craft.levelRequirements)],
+                    embeds: [
+                        getCraftEmbed(
+                            dbcraft,
+                            item?.tier ?? 1,
+                            craft.levelRequirements,
+                        ),
+                    ],
                     //components: [],
                 })
                 .catch();
@@ -206,8 +242,8 @@ const data: TaskDataLoad = {
     repeat: 0,
     autoStart: true,
     runOnStart: true,
-    notResetOnReload: true,
-    interval: 15,
+    notResetOnReload: false,
+    interval: -1,
 };
 
 module.exports = {
