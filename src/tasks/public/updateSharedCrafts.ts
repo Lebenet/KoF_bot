@@ -242,8 +242,8 @@ const data: TaskDataLoad = {
     repeat: 0,
     autoStart: true,
     runOnStart: true,
-    notResetOnReload: false,
-    interval: -1,
+    notResetOnReload: true,
+    interval: 15,
 };
 
 module.exports = {
