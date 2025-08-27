@@ -47,7 +47,6 @@ const tables = [
     // `DROP TABLE IF EXISTS Professions`,
 
     // End temporary
-
     `CREATE TABLE IF NOT EXISTS Users(
 		id TEXT PRIMARY KEY NOT NULL,
 		player_id TEXT,
@@ -82,7 +81,6 @@ const tables = [
 		UNIQUE(guild_id, settlement_id, command_name, command_param)
 	);`,
 
-    // `DROP TABLE IF EXISTS LastUpdateds`,
     `CREATE TABLE IF NOT EXISTS LastUpdateds(
 		table_name TEXT NOT NULL PRIMARY KEY,
 		last_updated DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -95,7 +93,6 @@ const tables = [
 		leader TEXT NOT NULL
 	);`,
 
-    // `DROP TABLE IF EXISTS SharedCraftsStatuss`,
     `CREATE TABLE IF NOT EXISTS SharedCraftsStatuss(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		guild_id TEXT NOT NULL,
@@ -104,7 +101,6 @@ const tables = [
 		UNIQUE (guild_id, channel_id, claim_id)
 	);`,
 
-    // `DROP TABLE IF EXISTS SharedCrafts`,
     `CREATE TABLE IF NOT EXISTS SharedCrafts(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		message_id TEXT NOT NULL,

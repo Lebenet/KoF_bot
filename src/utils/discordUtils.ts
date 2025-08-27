@@ -267,22 +267,20 @@ function globalEmbedFactory(embedType: EmbedType, color: number): EmbedBuilder {
 
     if (embedType.footer) {
         embed.setFooter(embedType.footer);
-    } else {
+    } else if (embedType.footer !== null) {
         embed.setFooter({
             text: "WIP. Contact `lebenet` for requests.",
             iconURL: client.avatarURL()!,
         });
     }
 
-    if (embedType.author !== null) {
-        if (embedType.author) {
-            embed.setAuthor(embedType.author);
-        } else {
-            embed.setAuthor({
-                name: client.displayName,
-                iconURL: client.avatarURL()!,
-            });
-        }
+    if (embedType.author) {
+        embed.setAuthor(embedType.author);
+    } else if (embedType.author !== null) {
+        embed.setAuthor({
+            name: client.displayName,
+            iconURL: client.avatarURL()!,
+        });
     }
 
     if (embedType.timestamp) {
@@ -329,9 +327,9 @@ export type EmbedType = {
     title?: string;
     description?: string;
     fields?: APIEmbedField[];
-    footer?: EmbedFooterOptions;
+    footer?: EmbedFooterOptions | null;
     author?: EmbedAuthorOptions | null;
-    timestamp?: boolean | number | Date;
+    timestamp?: boolean | number | Date | null;
     thumbnail?: string;
     image?: string;
 };

@@ -2,6 +2,7 @@ import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
     MessageFlags,
+    AutocompleteInteraction,
 } from "discord.js";
 import { primaryEmbed, xpToLevel } from "../../utils/discordUtils";
 import { Skill, User, Profession } from "../../db/dbTypes";
@@ -9,22 +10,23 @@ import { getParisDatetimeSQLiteSafe } from "../../utils/taskUtils";
 import { Config } from "../../utils/configLoader";
 
 async function link(interaction: ChatInputCommandInteraction, config: Config) {
-    let playerId: string = interaction.options.getString("player_id") ?? "";
-    let playerName: string = interaction.options.getString("player_name") ?? "";
+    let playerId: string =
+        interaction.options.getString("player_name") ??
+        interaction.options.getString("player_id") ??
+        "";
+    playerId = playerId.trim();
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    if (!playerId) {
-        if (!playerName) {
-            interaction.editReply(
-                "Utilisation incorrecte ! Faites `/help link` pour plus d'infos.",
-            );
-            return;
-        }
+    if (!playerId.match(/^\d+$/)) {
+        await interaction.editReply(
+            "Mauvaise utilisation !\nMerci de rentrer directement l'identifiant ou de choisir l'une des options.",
+        );
+    }
 
-        // FIXME: retrieve playerId from BitJita using name
-        interaction.editReply(
-            "WIP. Pas implémenté. Merci d'utiliser player_id.",
+    if (!playerId || playerId === "") {
+        await interaction.editReply(
+            "Utilisation incorrecte ! Faites `/help link` pour plus d'infos.",
         );
         return;
     }
@@ -39,9 +41,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
     try {
         const json = await res.json();
         if (json.error) {
-            if (playerName)
-                interaction.editReply("Le pseudo rentré n'est pas bon !");
-            else interaction.editReply("L'ID rentré n'est pas bon !");
+            await interaction.editReply("La rentrée n'est pas bonne !");
             return;
         }
 
@@ -68,7 +68,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
 
         // SUBJECT TO CHANGE IF BITJITA CHANGES; REPLACE WITH ACTUAL DB CONNEXION LATER ON
         const data: any = json.player;
-        playerName = data.username;
+        const playerName = data.username;
         User.ensureUserExists(
             interaction.user.id,
             interaction.user.displayName,
@@ -86,6 +86,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
 
         // Edit information
         user.player_id = playerId;
+        const oldName = user.player_username;
         user.player_username = playerName;
         if (!user.update()) {
             interaction.editReply(
@@ -97,6 +98,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
         const currTime = new Date(getParisDatetimeSQLiteSafe());
         // If user has already fetched skills recently
         if (
+            oldName === playerName &&
             user.last_updated_skills &&
             user.last_updated_skills.getTime() + 5 * 60_000 >=
                 currTime.getTime()
@@ -180,6 +182,59 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
     }
 }
 
+type Player = {
+    entityId: string;
+    username: string;
+    signedIn: boolean;
+    timePlayed: number;
+    timeSignedIn: number;
+    createdAt: string; // date
+    updatedAt: string; // date
+    lastLoginTimestamp: string; // date
+};
+
+type Request = {
+    players: Player[];
+    total: number;
+};
+
+async function autocomplete(
+    interaction: AutocompleteInteraction,
+    _config: Config,
+) {
+    const curr = interaction.options.getFocused();
+    if (curr.length < 2) {
+        interaction
+            .respond([
+                { name: "Entrez au moins 2 caractères !", value: "error" },
+            ])
+            .catch();
+        return;
+    }
+
+    const res = await fetch(
+        `https://bitjita.com/api/players?q=${curr}&page=1`,
+        {
+            method: "GET",
+            headers: {
+                "User-Agent": "Notary - lebenet on discord",
+            },
+        },
+    );
+
+    const req: Request = await res.json();
+    if (req.total > 10) req.players = req.players.slice(0, 10);
+
+    await interaction.respond(
+        req.players.map((p) => {
+            return {
+                name: `${p.username}, ${Math.round(p.timeSignedIn / 60 / 60)}h`,
+                value: p.entityId,
+            };
+        }),
+    );
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("link")
@@ -188,6 +243,7 @@ module.exports = {
             option
                 .setName("player_name")
                 .setDescription("Nom de votre compte joueur")
+                .setAutocomplete(true)
                 .setRequired(false),
         )
         .addStringOption((option) =>
@@ -200,6 +256,7 @@ module.exports = {
         ),
 
     execute: link,
+    autocomplete: autocomplete,
     help: () =>
         primaryEmbed({
             title: "Link - Aide",
@@ -210,11 +267,11 @@ module.exports = {
 		> 2 utilisations de la commande sont possibles:",
             fields: [
                 {
-                    name: "- ~~`/link <player_name>`~~",
+                    name: "- `/link <player_name>`",
                     value: "\
-				~~<__player_name__> est tout simplement votre nom en jeu.~~\n\
-				~~Il est recommandé d'utiliser cette option si vous ne souhaitez pas chercher votre ID.~~\n\
-				~~Le bot s'occupera ensuite de récupérer votre identifiant automatiquement.~~",
+				<__player_name__> est tout simplement votre nom en jeu.\n\
+				Il est recommandé d'utiliser cette option si vous ne souhaitez pas chercher votre ID.\n\
+				Le bot s'occupera ensuite de récupérer votre identifiant automatiquement.",
                 },
                 {
                     name: "- `/link <player_id>`",
