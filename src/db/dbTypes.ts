@@ -441,11 +441,11 @@ export class Model {
 
 export class User extends Model {
     public id!: string;
-    public player_id?: string | undefined;
+    public player_id?: string | null;
     public username!: string;
     public player_username!: string;
     public bot_perm!: number | string;
-    public last_updated_skills?: Date | undefined;
+    public last_updated_skills?: Date | null;
 
     public static ensureUserExists(
         userId: string,
