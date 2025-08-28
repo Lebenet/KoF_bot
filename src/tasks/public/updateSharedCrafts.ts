@@ -173,12 +173,13 @@ async function update(_data: TaskData, config: Config) {
                 dbcraft = new SharedCraft();
 
             // either new craft, or message got deleted
+            /*
             if (message === undefined) {
                 message = await channel.send(
                     "-# Awaiting update, please do not delete...",
                 );
                 dbcraft.message_id = message.id;
-            }
+            } */
 
             // Transform request result to db craft
             dbcraft.entityId = craft.entityId;
@@ -198,27 +199,36 @@ async function update(_data: TaskData, config: Config) {
             dbcraft.total = craft.totalActionsRequired;
             dbcraft.owner_name = craft.ownerUsername;
 
-            if (dbcraft._inserted) {
-                if (!dbcraft.update()) return;
-            } else {
-                if (!dbcraft.insert()) return;
+            const msg = {
+                content: "",
+                embeds: [
+                    getCraftEmbed(
+                        dbcraft,
+                        item?.tier ?? 1,
+                        craft.levelRequirements,
+                    ),
+                ],
+            };
+
+            if (message) {
+                if (dbcraft._inserted && !dbcraft.update()) return;
+                else if (!dbcraft._inserted && !dbcraft.insert()) return;
+                message.edit(msg).catch();
+                c++;
+                return;
+            }
+
+            message = await channel.send(msg);
+            dbcraft.message_id = message.id;
+
+            if (
+                (dbcraft._inserted && !dbcraft.update()) ||
+                (!dbcraft._inserted && !dbcraft.insert())
+            ) {
+                message.delete().catch();
+                return;
             }
             c++;
-
-            message
-                .edit({
-                    //content: dbcraft.status,
-                    content: "",
-                    embeds: [
-                        getCraftEmbed(
-                            dbcraft,
-                            item?.tier ?? 1,
-                            craft.levelRequirements,
-                        ),
-                    ],
-                    //components: [],
-                })
-                .catch();
         });
 
         await Promise.all(promises);
@@ -226,14 +236,14 @@ async function update(_data: TaskData, config: Config) {
             `All crafts processed, ${c} / ${req.craftResults.length} passed`,
         );
 
-        for (const completed of existing.values()) {
-            console.log("deleting " + completed.item_name);
-            channel.messages
-                .fetch(completed.message_id)
-                .then((msg) => msg.delete().catch())
-                .catch();
-            completed.delete();
-        }
+        const ids: string[] = [
+            ...existing.values().map((sc) => {
+                sc.delete();
+                return sc.message_id;
+            }),
+        ];
+
+        channel.bulkDelete(ids).catch();
     }
 }
 
