@@ -36,7 +36,7 @@ module.exports = {
 
         const command = new Command();
         command.id = interaction.options.getString("id")!;
-        if (!command.delete()) {
+        if (!(await command.delete())) {
             interaction.editReply("Failed");
             return;
         }

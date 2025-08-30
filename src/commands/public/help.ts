@@ -23,7 +23,7 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
         embed.setFields([
             {
                 name: "__Commandes__:",
-                value: getCommandsHelper(__dirname, true)
+                value: (await getCommandsHelper(__dirname, true))
                     .map(
                         (n) =>
                             `- **${n.name}**${(n.args?.length ?? 0 > 0) ? ` *(${n.args!.join(", ")})*` : ""}`,
@@ -77,8 +77,9 @@ async function help(interaction: ChatInputCommandInteraction, _config: Config) {
         });
 }
 
-module.exports = {
-    data: new SlashCommandBuilder()
+async function data() {
+    const commands = await getCommandsHelper(__dirname, true);
+    return new SlashCommandBuilder()
         .setName("help")
         .setDescription("Une commande pour afficher un message d'aide.")
         .addStringOption((option) =>
@@ -86,8 +87,12 @@ module.exports = {
                 .setName("commande")
                 .setDescription("Nom de la commande (optionel)")
                 .setRequired(false)
-                .addChoices(getCommandsHelper(__dirname, true)),
-        ),
+                .addChoices(commands),
+        );
+}
+
+module.exports = {
+    data: data,
 
     execute: help,
     help: () =>

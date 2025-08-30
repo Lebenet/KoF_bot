@@ -33,7 +33,7 @@ async function manageProvider(
     // Target settlement (if provided)
     const claimId = interaction.options.getString("claim");
     let setl: Settlement | null = null;
-    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (claimId) setl = await Settlement.get({ keys: "id", values: claimId });
     if (!setl && claimId) {
         await interaction.reply({
             content: "Claim pas trouvé !",
@@ -82,10 +82,12 @@ async function manageProvider(
                 keys.push("settlement_id");
                 values.push(setl.id);
             }
-            const provs = Fournisseur.fetchArray({
-                keys: keys,
-                values: values,
-            }).toSorted((p1: Fournisseur, p2: Fournisseur): number =>
+            const provs = (
+                await Fournisseur.fetchArray({
+                    keys: keys,
+                    values: values,
+                })
+            ).toSorted((p1: Fournisseur, p2: Fournisseur): number =>
                 p1.coordinator < p2.coordinator ? 1 : -1,
             );
 
@@ -144,10 +146,12 @@ async function manageProvider(
                 keys.push("settlement_id");
                 values.push(setl.id);
             }
-            const provs: Fournisseur[] = Fournisseur.fetchArray({
-                keys: keys,
-                values: values,
-            }).toSorted((p1: Fournisseur, p2: Fournisseur): number =>
+            const provs: Fournisseur[] = (
+                await Fournisseur.fetchArray({
+                    keys: keys,
+                    values: values,
+                })
+            ).toSorted((p1: Fournisseur, p2: Fournisseur): number =>
                 p1.coordinator < p2.coordinator ? 1 : -1,
             );
 
@@ -185,7 +189,7 @@ async function manageProvider(
         keys.push("settlement_id");
         values.push(setl.id);
     }
-    const provt = Fournisseur.get({
+    const provt = await Fournisseur.get({
         keys: keys,
         values: values,
     });
@@ -220,7 +224,7 @@ async function manageProvider(
     }
 
     // Create USER Profile if it doesn't exist
-    User.ensureUserExists(user.id, user.username);
+    await User.ensureUserExists(user.id, user.username);
 
     // Main logic (spaghetti, i ain't touching that shit)
 
@@ -230,7 +234,7 @@ async function manageProvider(
         keys.push("settlement_id");
         values.push(setl.id);
     }
-    const exists = Fournisseur.get({
+    const exists = await Fournisseur.get({
         keys: keys,
         values: values,
     });
@@ -239,7 +243,7 @@ async function manageProvider(
             await interaction.editReply(
                 `L'utilisateur **<@${user.id}>** n'étais déjà **pas** __fournisseur__ pour **${prof}${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
             );
-        else if (exists.delete())
+        else if (await exists.delete())
             await interaction.editReply(
                 `L'utilisateur **<@${user.id}>** a bien été retiré de la liste de __fournisseurs__ pour **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}.`,
             );
@@ -272,7 +276,7 @@ async function manageProvider(
             prov.coordinator = coord;
             prov.profession_name = prof;
         }
-        if (exists && coord ? exists.update() : prov.insert())
+        if (exists && coord ? await exists.update() : await prov.insert())
             await interaction.editReply(
                 `**<@${user.id}>** a bien été ${del ? "retiré" : "ajouté"} comme __${coord ? "coordinateur" : "fournisseur"}__ de **${prof}**${setl ? ` *pour __(${setl.s_name})__*` : ""}`,
             );
@@ -283,51 +287,56 @@ async function manageProvider(
     }
 }
 
+async function data() {
+    const professions = await getProfessionsStringSelectCommandArg();
+    const settlements = await getSettlementsHelper(__dirname, true);
+    return new SlashCommandBuilder()
+        .setName("gerer_fournisseur")
+        .setDescription(
+            "Gérer la liste des fournisseurs . Retirer un fournisseur lui retire aussi son rôle de coordinateur.",
+        )
+        .addStringOption((option) =>
+            option
+                .setName("claim")
+                .setDescription("Nom du claim")
+                .setRequired(false)
+                .addChoices(settlements),
+        )
+        .addStringOption((option) =>
+            option
+                .setName("profession")
+                .setDescription("Profession à lui assigner")
+                .setRequired(false)
+                .setChoices(professions),
+        )
+        .addUserOption((option) =>
+            option
+                .setName("membre")
+                .setDescription(
+                    "Utilisateur que vous souhaitez passer fournisseur",
+                )
+                .setRequired(false),
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName("coordinateur")
+                .setDescription(
+                    "True: gérer status coordinateur (False par défaut)",
+                )
+                .setRequired(false),
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName("retirer")
+                .setDescription(
+                    "True: retirer, False: ajouter (False par défaut)",
+                )
+                .setRequired(false),
+        );
+}
+
 module.exports = {
-    data: () =>
-        new SlashCommandBuilder()
-            .setName("gerer_fournisseur")
-            .setDescription(
-                "Gérer la liste des fournisseurs . Retirer un fournisseur lui retire aussi son rôle de coordinateur.",
-            )
-            .addStringOption((option) =>
-                option
-                    .setName("claim")
-                    .setDescription("Nom du claim")
-                    .setRequired(false)
-                    .addChoices(getSettlementsHelper(__dirname, true)),
-            )
-            .addStringOption((option) =>
-                option
-                    .setName("profession")
-                    .setDescription("Profession à lui assigner")
-                    .setRequired(false)
-                    .setChoices(getProfessionsStringSelectCommandArg()),
-            )
-            .addUserOption((option) =>
-                option
-                    .setName("membre")
-                    .setDescription(
-                        "Utilisateur que vous souhaitez passer fournisseur",
-                    )
-                    .setRequired(false),
-            )
-            .addBooleanOption((option) =>
-                option
-                    .setName("coordinateur")
-                    .setDescription(
-                        "True: gérer status coordinateur (False par défaut)",
-                    )
-                    .setRequired(false),
-            )
-            .addBooleanOption((option) =>
-                option
-                    .setName("retirer")
-                    .setDescription(
-                        "True: retirer, False: ajouter (False par défaut)",
-                    )
-                    .setRequired(false),
-            ),
+    data: data,
 
     execute: manageProvider,
     help: () =>

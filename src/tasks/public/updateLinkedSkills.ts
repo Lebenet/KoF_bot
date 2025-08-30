@@ -4,9 +4,9 @@ import { updateGsheetsSkills, updateSkills } from "../../utils/discordUtils";
 import { setTimeout } from "timers/promises";
 import { Config } from "../../utils/configLoader";
 
-async function updateLinkedSkills(data: TaskData, _config: Config) {
+async function updateLinkedSkills(_data: TaskData, _config: Config) {
     // FIXME: update ORM to allow for IS NOT NULL check
-    const users = User.fetchArray().filter((u) => u.player_id);
+    const users = (await User.fetchArray()).filter((u) => u.player_id);
     const len = users.length;
     let c = 0,
         vc = 0;
@@ -15,8 +15,8 @@ async function updateLinkedSkills(data: TaskData, _config: Config) {
     const interval = 5_000; // 5s
 
     while (c < len) {
-        // Get next slice (max 50)
-        const slclen = Math.min(50, len - c);
+        // Get next slice (max 10 / 5s = 100 / min = 6000 / hour)
+        const slclen = Math.min(10, len - c);
         const uslice = users.slice(c, c + slclen);
         c += slclen;
 

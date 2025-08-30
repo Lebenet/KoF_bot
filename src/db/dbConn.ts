@@ -1,41 +1,14 @@
-import Database from "better-sqlite3";
+// import Database from 'better-sqlite3';
+import { connect, Client as Database, SSLMode } from "ts-postgres";
 
 export const reloadDummyDbTables = ".s..";
 
 declare global {
-    var __db: Database.Database | undefined;
+    var __db: Database | undefined;
 }
 
-if (!globalThis.__db) {
-    const db = new Database("../db/database.db", {
-        nativeBinding:
-            "../node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-    });
-    //db.pragma("journal_mode = WAL");
-
-    globalThis.__db = db;
-
-    process.on("exit", () => {
-        try {
-            // db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
-        } catch (err) {
-            console.error("Checkpoint failed on exit:", err);
-        }
-        db.close();
-    });
-    process.on("SIGINT", () => {
-        try {
-            // db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
-        } catch (err) {
-            console.error("Checkpoint failed on exit:", err);
-        }
-        db.close();
-        process.exit();
-    });
-}
-
-// Temporary disable saving database (for dev testing): ":memory:"
-export const db = globalThis.__db as Database.Database;
+// Temporary disable saving database (for dev testing): ':memory:'
+export const db = (): Database => globalThis.__db as Database;
 // export const ready = () => db.open;
 
 const tables = [
@@ -50,14 +23,14 @@ const tables = [
     `CREATE TABLE IF NOT EXISTS Users(
 		id TEXT PRIMARY KEY NOT NULL,
 		player_id TEXT,
-		username VARCHAR(255) NOT NULL DEFAULT "empty_username",
-		player_username VARCHAR(255) NOT NULL DEFAULT "empty_game_username",
+		username VARCHAR(255) NOT NULL DEFAULT 'empty_username',
+		player_username VARCHAR(255) NOT NULL DEFAULT 'empty_game_username',
 		bot_perm INTEGER NOT NULL DEFAULT 0,
-		last_updated_skills DATETIME
+		last_updated_skills TIMESTAMPTZ
 	);`,
 
     `CREATE TABLE IF NOT EXISTS Settlements (
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		id SERIAL NOT NULL PRIMARY KEY,
 		guild_id TEXT NOT NULL,
 		s_name TEXT NOT NULL,
 		owner_id TEXT REFERENCES Users(id) ON DELETE SET NULL,
@@ -72,7 +45,7 @@ const tables = [
 	);`,
 
     `CREATE TABLE IF NOT EXISTS ChannelParams(
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		id SERIAL NOT NULL PRIMARY KEY,
 		channel_id TEXT NOT NULL,
 		guild_id TEXT NOT NULL,
 		settlement_id INTEGER REFERENCES Settlements(id) ON DELETE CASCADE, 
@@ -83,7 +56,7 @@ const tables = [
 
     `CREATE TABLE IF NOT EXISTS LastUpdateds(
 		table_name TEXT NOT NULL PRIMARY KEY,
-		last_updated DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
+		last_updated TIMESTAMPTZ NOT NULL DEFAULT now()
 	);`,
 
     `CREATE TABLE IF NOT EXISTS Empires(
@@ -94,7 +67,7 @@ const tables = [
 	);`,
 
     `CREATE TABLE IF NOT EXISTS SharedCraftsStatuss(
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		id SERIAL NOT NULL PRIMARY KEY,
 		guild_id TEXT NOT NULL,
 		channel_id TEXT NOT NULL,
 		claim_id TEXT NOT NULL,
@@ -102,7 +75,7 @@ const tables = [
 	);`,
 
     `CREATE TABLE IF NOT EXISTS SharedCrafts(
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		id SERIAL NOT NULL PRIMARY KEY,
 		message_id TEXT NOT NULL,
 		entityId TEXT NOT NULL,
 		status_id INTEGER NOT NULL REFERENCES SharedCraftsStatuss(id),
@@ -128,15 +101,15 @@ const tables = [
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
 		kind TEXT NOT NULL DEFAULT 'unknown',
 		description TEXT NOT NULL,
-		emoji TEXT NOT NULL DEFAULT "⁉️",
+		emoji TEXT NOT NULL DEFAULT '⁉️',
 		skill_id INTEGER NOT NULL DEFAULT 0
 	);`,
     `CREATE TABLE IF NOT EXISTS Fournisseurs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 		guild_id TEXT NOT NULL,
 		settlement_id INTEGER REFERENCES Settlements(id) ON DELETE CASCADE,
-		coordinator BOOLEAN NOT NULL DEFAULT FALSE CHECK (coordinator IN (0, 1)),
+		coordinator BOOLEAN NOT NULL DEFAULT FALSE,
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name) ON DELETE CASCADE,
 		UNIQUE(user_id, guild_id, settlement_id, profession_name)
 	);`,
@@ -149,19 +122,19 @@ const tables = [
 	);`,
 
     `CREATE TABLE IF NOT EXISTS Commands(
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		id SERIAL NOT NULL PRIMARY KEY,
 		guild_id TEXT NOT NULL,
 		settlement_id INTEGER REFERENCES Settlements(id) ON DELETE CASCADE,
 		thread_id TEXT NOT NULL,
 		message_id TEXT,
 		panel_message_id TEXT,
 		c_name VARCHAR(255) NOT NULL,
-		chest VARCHAR(255) NOT NULL DEFAULT "Pas de lieu de depot specifié.",
-		description TEXT NOT NULL DEFAULT "Une commande de matériaux.",
-		self_supplied BOOLEAN NOT NULL DEFAULT FALSE CHECK (self_supplied IN (0, 1)),
-		last_edited DATETIME NOT NULL DEFAULT (datetime('now', 'localtime')),
+		chest VARCHAR(255) NOT NULL DEFAULT 'Pas de lieu de depot specifié.',
+		description TEXT NOT NULL DEFAULT 'Une commande de matériaux.',
+		self_supplied BOOLEAN NOT NULL DEFAULT FALSE,
+		last_edited TIMESTAMPTZ NOT NULL DEFAULT now(),
 		author_id TEXT NOT NULL REFERENCES Users(id),
-		status VARCHAR(255) NOT NULL DEFAULT "Building"
+		status VARCHAR(255) NOT NULL DEFAULT 'Building'
 	);`,
     `CREATE TABLE IF NOT EXISTS CommandAssignees(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
@@ -171,11 +144,11 @@ const tables = [
     `CREATE TABLE IF NOT EXISTS CommandProfessions(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name) ON DELETE CASCADE,
-		filled BOOLEAN NOT NULL DEFAULT FALSE CHECK (filled IN (0, 1)),
+		filled BOOLEAN NOT NULL DEFAULT FALSE,
 		PRIMARY KEY (command_id, profession_name)
 	);`,
     `CREATE TABLE IF NOT EXISTS CommandItems (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		item_name TEXT NOT NULL,
 		quantity INTEGER NOT NULL DEFAULT 1,
@@ -186,58 +159,122 @@ const tables = [
     // TRIGGERS
 
     // Ensure settlement member perm level is owner if owner
-    `DROP TRIGGER IF EXISTS set_owner_settlement_perm_level`,
-    `CREATE TRIGGER IF NOT EXISTS set_owner_settlement_perm_level
+    `CREATE OR REPLACE FUNCTION set_owner_settlement_perm_level()
+	RETURNS TRIGGER AS $$
+	BEGIN
+		IF EXISTS (
+			SELECT 1 FROM Settlements s
+			WHERE s.id = NEW.settlement_id
+			AND s.owner_id = NEW.user_id
+		) THEN
+			NEW.perm_level := -1;
+		END IF;
+		RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;`,
+
+    `DROP TRIGGER IF EXISTS set_owner_settlement_perm_level ON SettlementMembers;`,
+
+    `CREATE TRIGGER set_owner_settlement_perm_level
 	BEFORE INSERT ON SettlementMembers
 	FOR EACH ROW
-	WHEN EXISTS (
-		SELECT 1 FROM Settlements s
-		WHERE s.id = NEW.settlement_id
-			AND s.owner_id = NEW.user_id
-	)
-	BEGIN
-		SELECT RAISE(IGNORE);
-		INSERT INTO SettlementMembers (settlement_id, user_id, perm_level)
-		VALUES (NEW.settlement_id, NEW.user_id, -1);
-	END;`,
+	EXECUTE FUNCTION set_owner_settlement_perm_level();`,
 
     // Prevent from changing settlement owner perm level if still owner
-    `DROP TRIGGER IF EXISTS keep_owner_settlement_perm_level`,
-    `CREATE TRIGGER IF NOT EXISTS keep_owner_settlement_perm_level
+    `CREATE OR REPLACE FUNCTION keep_owner_settlement_perm_level()
+	RETURNS TRIGGER AS $$
+	BEGIN
+		IF EXISTS (
+			SELECT 1 FROM Settlements s
+			WHERE s.id = NEW.settlement_id
+			AND s.owner_id = NEW.user_id
+		) THEN
+			-- Block update
+			RAISE EXCEPTION 'Cannot change owner permission level while user is still owner';
+		END IF;
+		RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;`,
+
+    `DROP TRIGGER IF EXISTS keep_owner_settlement_perm_level ON SettlementMembers;`,
+
+    `CREATE TRIGGER keep_owner_settlement_perm_level
 	BEFORE UPDATE ON SettlementMembers
 	FOR EACH ROW
-	WHEN EXISTS (
-		SELECT 1 FROM Settlements s
-		WHERE s.id = NEW.settlement_id
-			AND s.owner_id = NEW.user_id
-	)
-	BEGIN
-		SELECT RAISE(IGNORE);
-	END;`,
+	EXECUTE FUNCTION keep_owner_settlement_perm_level();`,
 
     // Add owner to known members of new settlement with owner perm level
-    `DROP TRIGGER IF EXISTS add_owner_settlement_perm_level`,
-    `CREATE TRIGGER IF NOT EXISTS add_owner_settlement_perm_level
+    `CREATE OR REPLACE FUNCTION add_owner_settlement_perm_level()
+	RETURNS TRIGGER AS $$
+	BEGIN
+		IF NEW.owner_id IS NOT NULL THEN
+			INSERT INTO SettlementMembers (settlement_id, user_id, perm_level)
+			VALUES (NEW.id, NEW.owner_id, -1)
+			ON CONFLICT DO NOTHING; -- in case already exists
+		END IF;
+		RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;`,
+
+    `DROP TRIGGER IF EXISTS add_owner_settlement_perm_level ON Settlements;`,
+
+    `CREATE TRIGGER add_owner_settlement_perm_level
 	AFTER INSERT ON Settlements
 	FOR EACH ROW
-	BEGIN
-		INSERT INTO SettlementMembers (settlement_id, user_id, perm_level)
-		VALUES (NEW.id, NEW.owner_id, -1);
-	END;`,
+	EXECUTE FUNCTION add_owner_settlement_perm_level();`,
 ];
 
-export function init() {
+export async function init(): Promise<Database> {
+    if (globalThis.__db) return globalThis.__db;
+    globalThis.__db = await connect({
+        host: process.env.POSTGRES_HOST,
+        port: Number(process.env.POSTGRES_PORT),
+        user: process.env.POSTGRES_USER,
+        database: process.env.POSTGRES_DB,
+        password: process.env.POSTGRES_PASSWORD,
+        // types ?
+        // extraFloatDigits: 0,
+        // keepAlive: true,
+        // preparedStatementPrefix: 'tsp_',
+        // connectionTimeout: 10,
+        ssl: SSLMode.Disable,
+    });
+
+    process.on("exit", () => {
+        try {
+        } catch (err) {
+            console.error("Checkpoint failed on exit:", err);
+        }
+        db().end().catch(console.log);
+    });
+    process.on("SIGINT", () => {
+        try {
+        } catch (err) {
+            console.error("Checkpoint failed on exit:", err);
+        }
+        db().end().catch(console.log);
+        process.exit();
+    });
+    process.on("SIGTERM", () => {
+        try {
+        } catch (err) {
+            console.error("Checkpoint failed on exit:", err);
+        }
+        db().end().catch(console.log);
+        process.exit();
+    });
+
     // Make sure every table exists correctly
     console.log("[STARTUP] Making sure DB schema is correct...");
     for (const table of tables) {
         try {
-            db.exec(table);
+            await db().query(table);
         } catch (err) {
             console.log(table);
             throw err;
         }
     }
     console.log("[STARTUP] If no errors, then schema is correct.");
-}
 
-init();
+    return globalThis.__db;
+}

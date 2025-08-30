@@ -31,7 +31,7 @@ async function channelParams(
 
     const claimId = interaction.options.getString("claim");
     let setl: Settlement | null = null;
-    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (claimId) setl = await Settlement.get({ keys: "id", values: claimId });
     if (!setl && claimId) {
         await interaction.editReply("Claim pas trouvé !");
         return;
@@ -58,7 +58,7 @@ async function channelParams(
     const options: DbOptions | null =
         keys.length > 0 ? { keys: keys, values: values } : null;
 
-    let params = ChannelParam.fetch(options);
+    let params = await ChannelParam.fetch(options);
 
     if (!params) {
         await interaction.editReply("No channel params were found.");

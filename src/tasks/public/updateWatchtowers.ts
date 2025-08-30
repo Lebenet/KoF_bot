@@ -230,7 +230,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
 } //
 
 export async function updateWatchtowers(_data: TaskData, config: Config) {
-    const all = WatchtowerStatus.fetchArray();
+    const all = await WatchtowerStatus.fetchArray();
     const map = new Map<string, Watchtower[]>();
 
     const dngrclr = dangerEmbed({}).data.color;
@@ -259,7 +259,7 @@ export async function updateWatchtowers(_data: TaskData, config: Config) {
         if (!chan) continue;
         const msg = await chan.messages.fetch(ws.message_id);
 
-        const empire: Empire | null = Empire.get({
+        const empire: Empire | null = await Empire.get({
             keys: "entityId",
             values: eid,
         });

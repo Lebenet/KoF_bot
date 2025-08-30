@@ -1,7 +1,6 @@
 import {
     AutocompleteInteraction,
     ChannelType,
-    ChatInputApplicationCommandData,
     ChatInputCommandInteraction,
     MessageFlags,
     PermissionFlagsBits,
@@ -41,14 +40,14 @@ async function setupWatchtowers(
     ]);
     const del: boolean = interaction.options.getBoolean("del") || false;
 
-    const emp = Empire.get({ keys: "entityId", values: empId });
+    const emp = await Empire.get({ keys: "entityId", values: empId });
     if (!emp) {
         await interaction.editReply("Empire not found !");
         return;
     }
 
     if (del) {
-        const ws = WatchtowerStatus.get({
+        const ws = await WatchtowerStatus.get({
             keys: ["guild_id", "channel_id", "empire_id"],
             values: [interaction.guildId!, chan.id, empId],
         });
@@ -56,7 +55,7 @@ async function setupWatchtowers(
             await interaction.editReply("Param not found !");
             return;
         }
-        if (!ws.delete()) {
+        if (!(await ws.delete())) {
             await interaction.editReply("Failed to delete !");
             return;
         }
@@ -76,7 +75,7 @@ async function setupWatchtowers(
     });
     ws.message_id = msg.id;
 
-    if (!ws.insert()) {
+    if (!(await ws.insert())) {
         await interaction.editReply("Failed to add!");
         return;
     }
@@ -90,7 +89,7 @@ async function getEmpires(curr: string): Promise<Empire[]> {
 
     const lu = new LastUpdated();
     lu.table_name = "Empires";
-    if (!lu.sync()) lu.last_updated = new Date(0);
+    if (!(await lu.sync())) lu.last_updated = new Date(0);
 
     if (lu.last_updated.getTime() + 15_000 * 60_000 < Date.now()) {
         console.time("fetching empires");
@@ -101,23 +100,23 @@ async function getEmpires(curr: string): Promise<Empire[]> {
             },
         });
         const res: qRes = await resRaw.json();
-        res.empires.forEach((e: empire) => {
+        for (const e of res.empires) {
             const emp = new Empire();
             emp.entityId = e.entityId;
-            emp.sync();
+            await emp.sync();
             emp.e_name = e.name;
             emp.memberCount = e.memberCount;
             emp.leader = e.leader;
-            if (emp._inserted) emp.update();
-            else emp.insert();
-        });
+            if (emp._inserted) await emp.update();
+            else await emp.insert();
+        }
         lu.last_updated = new Date();
-        if (lu._inserted) lu.update();
-        else lu.insert();
+        if (lu._inserted) await lu.update();
+        else await lu.insert();
         console.timeEnd("fetching empires");
     }
 
-    return Empire.fetchArray({
+    return await Empire.fetchArray({
         keys: "e_name",
         values: `LIKE %${curr}%`,
         limit: 10,

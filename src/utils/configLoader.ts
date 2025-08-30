@@ -1,14 +1,14 @@
 import fs from "fs";
 import path from "path";
 import { exit } from "process";
-import Database from "better-sqlite3";
 import { Client } from "discord.js";
 import * as states from "./states";
+import { Client as Database } from "ts-postgres";
 
 export type Config = {
     locked: boolean;
     bot: Client;
-    db: Database.Database;
+    db: Database;
     admins: Array<string>;
     [key: string]: any;
 };
@@ -73,6 +73,6 @@ export function loadConfig(
 
 export const getConfig = (): Config => config as Config;
 
-export const setDb = (db: Database.Database) => (config.db = db);
+export const setDb = (db: Database) => (config.db = db);
 
 export const setBot = (bot: Client) => (config.bot = bot);

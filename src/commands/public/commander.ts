@@ -67,7 +67,7 @@ async function order(
 
     // Check that it is a correct claim
     let setl: Settlement | null = null;
-    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (claimId) setl = await Settlement.get({ keys: "id", values: claimId });
     if (!setl && claimId) {
         await interaction.reply({
             content: "Claim pas trouvé !",
@@ -79,7 +79,7 @@ async function order(
     // Check that the user isn't already prepping a command in that claim
     let tryCmd: Command | null;
     if (
-        (tryCmd = Command.get({
+        (tryCmd = await Command.get({
             keys: ["author_id", "guild_id", "settlement_id"],
             values: [interaction.user.id, guildId, claimId || null],
         })) &&
@@ -97,13 +97,13 @@ async function order(
         return;
     }
 
-    const chan = ChannelParam.getParam(
+    const chan = await ChannelParam.getParam(
         guildId,
         "commander",
         "commandes_channel_id",
         setl?.id ?? null,
     );
-    const panel = ChannelParam.getParam(
+    const panel = await ChannelParam.getParam(
         guildId,
         "commander",
         "panel_channel_id",
@@ -172,12 +172,15 @@ async function initHandler(
     config: Config,
 ) {
     // What follows depends also on userId
-    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
+    await User.ensureUserExists(
+        interaction.user.id,
+        interaction.user.displayName,
+    );
 
     const guildId = interaction.customId.split("|")[0];
     const setlId = Number(interaction.customId.split("|")[3]);
 
-    const chan = ChannelParam.getParam(
+    const chan = await ChannelParam.getParam(
         guildId,
         "commander",
         "commandes_channel_id",
@@ -236,7 +239,7 @@ async function initHandler(
     command.self_supplied = self_supplied;
     command.author_id = interaction.user.id;
 
-    if (!command.insert()?.sync()) {
+    if (!(await (await command.insert())?.sync())) {
         await thread.delete();
         await interaction.editReply(
             `Votre commande **${c_name}** n'a pas pu être créée (insert failed). Veuillez réessayer.`,
@@ -266,7 +269,7 @@ async function initHandler(
             .setStyle(ButtonStyle.Secondary);
 
         // Profession select menu
-        const opts = getProfessionsStringSelectMessageComp();
+        const opts = await getProfessionsStringSelectMessageComp();
         const profs = new StringSelectMenuBuilder()
             .setCustomId(`|commander|manageProfessionsHandler|${command.id}`)
             .setPlaceholder("Métiers")
@@ -334,9 +337,9 @@ async function initHandler(
         msg.pin();
 
         command.message_id = msg.id;
-        if (!command.update()) {
+        if (!(await command.update())) {
             await thread.delete();
-            command.delete();
+            await command.delete();
             await interaction.editReply(
                 `Votre commande **${c_name}** n'a pas pu être créée (update failed). Veuillez réessayer.`,
             );
@@ -358,7 +361,7 @@ async function manageProfessionsHandler(
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -381,9 +384,13 @@ async function manageProfessionsHandler(
         prof.command_id = command.id;
         prof.profession_name = s;
         prof.filled = false;
-        if (!prof.insert()) {
+        if (!(await prof.insert())) {
             await interaction.editReply("L'interaction a échouée.");
-            profs.forEach((p) => p.delete());
+            profs.forEach((p) =>
+                p.delete().catch((err) => {
+                    throw err;
+                }),
+            );
             return;
         }
         profs.push(prof);
@@ -436,7 +443,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -451,14 +458,14 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
-    if (!command.delete()) {
+    if (!(await command.delete())) {
         await interaction.editReply(
             "Echec lors de la suppression, veuillez réessayer.",
         );
         return;
     }
 
-    const panel = ChannelParam.getParam(
+    const panel = await ChannelParam.getParam(
         interaction.guildId ?? "0",
         "commander",
         "panel_channel_id",
@@ -508,7 +515,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -554,7 +561,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     const msgRow2 = msg.components[1];
 
     // Get panel to send message to
-    const ppanel = ChannelParam.getParam(
+    const ppanel = await ChannelParam.getParam(
         interaction.guildId ?? "0",
         "commander",
         "panel_channel_id",
@@ -571,13 +578,13 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
                 "Le salon panels n'a pas été défini! Faites d'abord `/setup_commandes` ou contactez un admin.",
             )
             .catch(console.log);
-        command.delete();
-        (interaction.channel as ThreadChannel).delete();
+        command.delete().catch();
+        (interaction.channel as ThreadChannel).delete().catch();
         return;
     }
 
     // Build panel embed
-    const embed = getPanelEmbed(command);
+    const embed = await getPanelEmbed(command);
 
     // Assign provider panel
     const assignMenu = new UserSelectMenuBuilder()
@@ -604,11 +611,11 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
 
     command.panel_message_id = panelMsg.id;
     command.status = "Ready";
-    if (!command.update()) {
+    if (!(await command.update())) {
         interaction
             .editReply("Erreur de database! L'interaction a échouée.")
             .catch(console.log);
-        panelMsg.delete();
+        panelMsg.delete().catch();
         return;
     }
 
@@ -629,7 +636,7 @@ async function assignHandler(
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -640,7 +647,7 @@ async function assignHandler(
     // MAYBE: only propose known providers of the right professions instead of anyone
     // MAYBE: Change interaction from UserSelectMenu to StringSelectMenu with the usernames of the providers
 
-    const chan = ChannelParam.getParam(
+    const chan = await ChannelParam.getParam(
         interaction.guildId!,
         "commander",
         "commandes_channel_id",
@@ -666,10 +673,10 @@ async function assignHandler(
     }
     if (
         !config.admins?.includes(interaction.user.id) &&
-        !Fournisseur.get({
+        !(await Fournisseur.get({
             keys: keys,
             values: values,
-        })
+        }))
     ) {
         await interaction.editReply(
             "Vous n'avez pas le droit de faire cette action !",
@@ -687,8 +694,8 @@ async function assignHandler(
         interaction
             .editReply("Le thread de la commande a été supprimé !")
             .catch(console.log);
-        command.delete();
-        interaction.message.delete();
+        command.delete().catch();
+        interaction.message.delete().catch();
         return;
     }
 
@@ -702,17 +709,17 @@ async function assignHandler(
         assign.user_id = id;
 
         // Make sure user is registered in the DB
-        User.ensureUserExists(id, user.displayName);
+        await User.ensureUserExists(id, user.displayName);
 
         // If it already exists, don't push it
-        if (assign.sync()) continue;
+        if (await assign.sync()) continue;
 
         // Try to insert in DB
-        if (!assign.insert()) {
+        if (!(await assign.insert())) {
             interaction
                 .editReply("Erreur de Database, veuillez réessayer.")
                 .catch(console.log);
-            insertAssignees.forEach((a) => a.delete());
+            insertAssignees.forEach((a) => a.delete().catch());
             return;
         }
 
@@ -724,7 +731,7 @@ async function assignHandler(
     }
 
     // Edit assigned members
-    const embed = getPanelEmbed(command);
+    const embed = await getPanelEmbed(command);
 
     await interaction.message.edit({
         content: interaction.message.content,
@@ -740,7 +747,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -754,7 +761,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
     if (interaction.channelId === command.thread_id) {
         thread = interaction.channel as ThreadChannel;
 
-        const panel = ChannelParam.getParam(
+        const panel = await ChannelParam.getParam(
             interaction.guildId!,
             "commander",
             "panel_channel_id",
@@ -782,7 +789,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             );
         }
     } else {
-        const chan = ChannelParam.getParam(
+        const chan = await ChannelParam.getParam(
             interaction.guildId!,
             "commander",
             "commandes_channel_id",
@@ -822,19 +829,22 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         }
     }
 
-    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
+    await User.ensureUserExists(
+        interaction.user.id,
+        interaction.user.displayName,
+    );
 
     const assign = new CommandAssignee();
     assign.command_id = command.id;
     assign.user_id = interaction.user.id;
-    if (!assign.insert()) {
+    if (!(await assign.insert())) {
         await interaction.editReply("Vous êtes déjà sur cette commande.");
         return;
     }
 
     thread.members.add(interaction.user).catch(console.log);
 
-    const embed = getPanelEmbed(command);
+    const embed = await getPanelEmbed(command);
 
     if (panelMsg)
         await panelMsg.edit({
@@ -849,7 +859,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 async function addItemsSend(interaction: ButtonInteraction, config: Config) {
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.reply({
             content:
                 "Erreur de Database, pas réussi à enregistrer l'interaction.",
@@ -895,11 +905,13 @@ async function addItemsSend(interaction: ButtonInteraction, config: Config) {
     await interaction.showModal(modal);
 }
 
-function getPanelEmbed(command: Command): EmbedBuilder {
-    const items = CommandItem.fetchArray({
-        keys: "command_id",
-        values: command.id,
-    })
+async function getPanelEmbed(command: Command): Promise<EmbedBuilder> {
+    const items = (
+        await CommandItem.fetchArray({
+            keys: "command_id",
+            values: command.id,
+        })
+    )
         .toSorted(
             (i1, i2) => i2.quantity - i2.progress - (i1.quantity - i1.progress),
         )
@@ -948,7 +960,7 @@ function getPanelEmbed(command: Command): EmbedBuilder {
         ret.addFields([
             {
                 name: "Claim",
-                value: setl.sync() ? setl.s_name : "Erreur",
+                value: (await setl.sync()) ? setl.s_name : "Erreur",
                 inline: false,
             },
         ]);
@@ -964,20 +976,24 @@ function getPanelEmbed(command: Command): EmbedBuilder {
         {
             name: "Professions:",
             value:
-                CommandProfession.fetchArray({
-                    keys: "command_id",
-                    values: command.id,
-                })
+                (
+                    await CommandProfession.fetchArray({
+                        keys: "command_id",
+                        values: command.id,
+                    })
+                )
                     .map((p) => p.profession_name)
                     .join(", ") || "Pas précisé.",
         },
         ...rows,
         {
             name: "Assignés",
-            value: CommandAssignee.fetchArray({
-                keys: "command_id",
-                values: command.id,
-            })
+            value: (
+                await CommandAssignee.fetchArray({
+                    keys: "command_id",
+                    values: command.id,
+                })
+            )
                 .map((a) => `<@${a.user_id}>`)
                 .join(", "),
         },
@@ -987,7 +1003,7 @@ function getPanelEmbed(command: Command): EmbedBuilder {
 }
 
 async function updatePanel(command: Command, config: Config) {
-    const panelParam = ChannelParam.getParam(
+    const panelParam = await ChannelParam.getParam(
         command.guild_id,
         "commander",
         "panel_channel_id",
@@ -1000,14 +1016,17 @@ async function updatePanel(command: Command, config: Config) {
 
     panel.messages
         .fetch(command.panel_message_id!)
-        .then((msg) => {
-            const embed = getPanelEmbed(command);
-            msg.edit({
-                content: msg.content,
-                embeds: [embed],
-                components: msg.components,
-            }).catch(console.log);
-        })
+        .then((msg) =>
+            getPanelEmbed(command).then((embed) =>
+                msg
+                    .edit({
+                        content: msg.content,
+                        embeds: [embed],
+                        components: msg.components,
+                    })
+                    .catch(console.log),
+            ),
+        )
         .catch(console.log);
 }
 
@@ -1019,7 +1038,7 @@ async function addItemsHandler(
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    if (!(await command.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -1027,7 +1046,7 @@ async function addItemsHandler(
     }
 
     // get thread
-    const channel = ChannelParam.getParam(
+    const channel = await ChannelParam.getParam(
         interaction.guildId!,
         "commander",
         "commandes_channel_id",
@@ -1090,7 +1109,7 @@ async function addItemsHandler(
         if (!item.item_name || !item.quantity) return;
         item.progress = 0;
 
-        if (!item.insert()?.sync()) return;
+        if (!(await (await item.insert())?.sync())) return;
 
         // Create components
         const advanceBut = new ButtonBuilder()
@@ -1119,9 +1138,9 @@ async function addItemsHandler(
         });
 
         item.message_id = msg.id;
-        if (!item.update()) {
-            msg.delete();
-            item.delete();
+        if (!(await item.update())) {
+            msg.delete().catch();
+            item.delete().catch();
         } else msg.pin();
     });
 
@@ -1131,10 +1150,12 @@ async function addItemsHandler(
     // Add items follow-up in thread
     const srcMsg = await thread.messages.fetch(command.message_id!);
     const items = shortenText(
-        CommandItem.fetchArray({
-            keys: "command_id",
-            values: command.id,
-        })
+        (
+            await CommandItem.fetchArray({
+                keys: "command_id",
+                values: command.id,
+            })
+        )
             .toSorted(
                 (i1, i2) =>
                     i2.quantity - i2.progress - (i1.quantity - i1.progress),
@@ -1166,7 +1187,7 @@ async function updateItem(
     message?: Message<boolean>,
 ) {
     let thread: ThreadChannel | undefined;
-    const param = ChannelParam.getParam(
+    const param = await ChannelParam.getParam(
         command.guild_id,
         "commander",
         "commandes_channel_id",
@@ -1193,10 +1214,12 @@ async function updateItem(
 
     const srcMsg = await thread.messages.fetch(command.message_id!);
     const items = shortenText(
-        CommandItem.fetchArray({
-            keys: "command_id",
-            values: command.id,
-        })
+        (
+            await CommandItem.fetchArray({
+                keys: "command_id",
+                values: command.id,
+            })
+        )
             .toSorted(
                 (i1, i2) =>
                     i2.quantity - i2.progress - (i1.quantity - i1.progress),
@@ -1228,7 +1251,7 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
     const item = new CommandItem();
     item.id = itemId;
 
-    if (!command.sync() || !item.sync()) {
+    if (!(await command.sync()) || !(await item.sync())) {
         interaction
             .reply({
                 content:
@@ -1251,7 +1274,12 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
 
     if (
         interaction.user.id !== command.author_id &&
-        !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
+        !(
+            await CommandAssignee.fetchArray({
+                keys: "command_id",
+                values: command.id,
+            })
+        )
             .map((a) => a.user_id)
             .includes(interaction.user.id) &&
         !config.admins?.includes(interaction.user.id)
@@ -1295,7 +1323,7 @@ async function advanceItemHandler(
     command.id = interaction.customId.split("|")[3];
     const item = new CommandItem();
     item.id = interaction.customId.split("|")[4];
-    if (!command.sync() || !item.sync()) {
+    if (!(await command.sync()) || !(await item.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -1317,7 +1345,7 @@ async function advanceItemHandler(
     }
 
     item.progress = Math.min(item.quantity, item.progress + quantity);
-    if (!item.update()) {
+    if (!(await item.update())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -1339,7 +1367,7 @@ async function completeItemHandler(
     command.id = interaction.customId.split("|")[3];
     const item = new CommandItem();
     item.id = interaction.customId.split("|")[4];
-    if (!command.sync() || !item.sync()) {
+    if (!(await command.sync()) || !(await item.sync())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -1355,7 +1383,12 @@ async function completeItemHandler(
 
     if (
         interaction.user.id !== command.author_id &&
-        !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
+        !(
+            await CommandAssignee.fetchArray({
+                keys: "command_id",
+                values: command.id,
+            })
+        )
             .map((a) => a.user_id)
             .includes(interaction.user.id) &&
         !config.admins?.includes(interaction.user.id)
@@ -1365,7 +1398,7 @@ async function completeItemHandler(
     }
 
     item.progress = item.quantity;
-    if (!item.update()) {
+    if (!(await item.update())) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
         );
@@ -1378,20 +1411,24 @@ async function completeItemHandler(
     interaction.deleteReply();
 }
 
+async function data() {
+    const settlements = await getSettlementsHelper(__dirname, true);
+    return new SlashCommandBuilder()
+        .setName("commander")
+        .setDescription("Créer une commande de matériaux.")
+        .addStringOption((option) =>
+            option
+                .setName("claim")
+                .setDescription(
+                    "Claim dans lequel tu souhaites faire une commande",
+                )
+                .setRequired(false)
+                .addChoices(settlements),
+        );
+}
+
 module.exports = {
-    data: () =>
-        new SlashCommandBuilder()
-            .setName("commander")
-            .setDescription("Créer une commande de matériaux.")
-            .addStringOption((option) =>
-                option
-                    .setName("claim")
-                    .setDescription(
-                        "Claim dans lequel tu souhaites faire une commande",
-                    )
-                    .setRequired(false)
-                    .addChoices(getSettlementsHelper(__dirname, true)),
-            ),
+    data: data,
 
     execute: order,
     initHandler: initHandler,

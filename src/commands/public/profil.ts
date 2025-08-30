@@ -25,7 +25,7 @@ async function getProfileEmbed(
 
     const user = new User();
     user.id = userId;
-    if (!user.sync())
+    if (!(await user.sync()))
         return warningEmbed({
             title: "Erreur",
             description: "DB error",
@@ -45,10 +45,12 @@ async function getProfileEmbed(
             {
                 name: "Rôles:",
                 value:
-                    Fournisseur.fetchArray({
-                        keys: ["user_id", "guild_id"],
-                        values: [userId, guildId],
-                    })
+                    (
+                        await Fournisseur.fetchArray({
+                            keys: ["user_id", "guild_id"],
+                            values: [userId, guildId],
+                        })
+                    )
                         .toSorted((f1, f2) =>
                             f1.coordinator < f2.coordinator ? 1 : -1,
                         )
@@ -65,7 +67,7 @@ async function getSkillsEmbed(
 ) {
     const user = new User();
     user.id = userId;
-    if (!user.sync())
+    if (!(await user.sync()))
         return warningEmbed({
             title: "Erreur",
             description: "DB error",
@@ -79,18 +81,23 @@ async function getSkillsEmbed(
 
     const member = await interaction.guild!.members.fetch(userId);
 
-    const skills = Skill.fetchArray({
-        keys: "user_id",
-        values: userId,
-    }).toSorted((s1, s2) => (s1.profession_name < s2.profession_name ? -1 : 1));
-    const pskills = skills.filter((s) =>
+    const skills = (
+        await Skill.fetchArray({
+            keys: "user_id",
+            values: userId,
+        })
+    ).toSorted((s1, s2) => (s1.profession_name < s2.profession_name ? -1 : 1));
+    const kinds = await Promise.all(
+        skills.map((s) => getKind(s.profession_name)),
+    );
+
+    const pskills = skills.filter((_, i) =>
         [SkillKind.Profession, SkillKind.Gather, SkillKind.Refine].includes(
-            getKind(s.profession_name),
+            kinds[i],
         ),
     );
-    const sskills = skills.filter(
-        (s) => getKind(s.profession_name) === SkillKind.Skill,
-    );
+
+    const sskills = skills.filter((_, i) => kinds[i] === SkillKind.Skill);
 
     return primaryEmbed({
         author: {
@@ -159,7 +166,7 @@ async function profil(
 ) {
     const displaySkills = interaction.options.getBoolean("skills") ?? false;
     const user = interaction.options.getUser("joueur") ?? interaction.user;
-    User.ensureUserExists(user.id, user.displayName);
+    await User.ensureUserExists(user.id, user.displayName);
 
     const embeds = [
         displaySkills
@@ -188,10 +195,12 @@ async function gotoProfileHandler(
     const embeds = [await getProfileEmbed(targetId, interaction)];
     const components = getComponents(false, targetId, authorId);
 
-    interaction.update({
-        embeds: embeds,
-        components: components,
-    });
+    interaction
+        .update({
+            embeds: embeds,
+            components: components,
+        })
+        .catch();
 }
 
 async function gotoSkillsHandler(
@@ -203,10 +212,12 @@ async function gotoSkillsHandler(
     const embeds = [await getSkillsEmbed(targetId, interaction)];
     const components = getComponents(true, targetId, authorId);
 
-    interaction.update({
-        embeds: embeds,
-        components: components,
-    });
+    interaction
+        .update({
+            embeds: embeds,
+            components: components,
+        })
+        .catch();
 }
 
 async function updateSkillsHandler(

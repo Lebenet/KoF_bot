@@ -17,9 +17,7 @@ export function fakeParisTimeToUTC() {
     return new Date(now.getTime() + parisOffset * 60 * 1000);
 }
 
-export function getParisDatetimeSQLiteSafe(date?: Date | null): string {
-    const now = date ? date : new Date();
-
+export function getParisDatetimeSQLiteSafe(date: Date = new Date()): string {
     const parts = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Europe/Paris",
         year: "numeric",
@@ -29,14 +27,15 @@ export function getParisDatetimeSQLiteSafe(date?: Date | null): string {
         minute: "2-digit",
         second: "2-digit",
         hour12: false,
-    }).formatToParts(now);
+        timeZoneName: "shortOffset", // gives e.g. "+02:00"
+    }).formatToParts(date);
 
     const map: Record<string, string> = {};
     parts.forEach(({ type, value }) => {
         if (type !== "literal") map[type] = value;
     });
 
-    return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
+    return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}${map.timeZoneName}`;
 }
 
 export function computeNextTimestamp(data: any) {

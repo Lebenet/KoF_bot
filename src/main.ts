@@ -21,7 +21,6 @@ import {
     Interaction,
     MessageFlags,
     ModalSubmitInteraction,
-    AutocompleteInteraction,
     ThreadChannel,
 } from "discord.js";
 
@@ -33,8 +32,8 @@ import { getConfig, setDb, setBot } from "./utils/configLoader";
 
 import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
 
-import { db } from "./db/dbConn";
-setDb(db);
+import { init } from "./db/dbConn";
+import { changeProfs } from "./db/dbTypes";
 
 // Load discord bot token from .env
 require("dotenv").config();
@@ -59,11 +58,15 @@ if (!fs.existsSync(path.resolve("temp/"))) fs.mkdirSync("temp/");
 
 // Log in to bot client
 client.login(token).then(() => {
-    setBot(client); // Commands & tasks
+    init().then(async (db) => {
+        setDb(db);
+        changeProfs();
+        setBot(client); // Commands & tasks
 
-    // Start watcher
-    console.log(`[STARTUP] Starting watcher...`);
-    start();
+        // Start watcher
+        console.log(`[STARTUP] Starting watcher...`);
+        start();
+    });
 });
 
 async function handleDeferredReply(

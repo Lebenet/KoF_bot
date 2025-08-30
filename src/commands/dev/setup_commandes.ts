@@ -59,20 +59,20 @@ async function setupCommands(
 
     const claimId = interaction.options.getString("claim");
     let setl: Settlement | null = null;
-    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (claimId) setl = await Settlement.get({ keys: "id", values: claimId });
     if (!setl && claimId) {
         await interaction.editReply("Claim pas trouvé !");
         return;
     }
 
-    let param = ChannelParam.getParam(
+    let param = await ChannelParam.getParam(
         guildId,
         "commander",
         "commandes_channel_id",
         setl?.id ?? null,
     );
 
-    let param2 = ChannelParam.getParam(
+    let param2 = await ChannelParam.getParam(
         guildId,
         "commander",
         "panel_channel_id",
@@ -82,7 +82,7 @@ async function setupCommands(
     let s1 = false;
     if (param) {
         param.channel_id = channel.id;
-        s1 = param.update();
+        s1 = await param.update();
     } else {
         param = new ChannelParam();
         param.guild_id = guildId;
@@ -90,13 +90,13 @@ async function setupCommands(
         param.command_param = "commandes_channel_id";
         param.settlement_id = setl?.id;
         param.channel_id = channel.id;
-        s1 = param.insert() ? true : false;
+        s1 = (await param.insert()) ? true : false;
     }
 
     let s2 = false;
     if (param2) {
         param2.channel_id = panel.id;
-        s2 = param2.update();
+        s2 = await param2.update();
     } else {
         param2 = new ChannelParam();
         param2.guild_id = guildId;
@@ -104,7 +104,7 @@ async function setupCommands(
         param2.command_param = "panel_channel_id";
         param2.settlement_id = setl?.id;
         param2.channel_id = panel.id;
-        s2 = param2.insert() ? true : false;
+        s2 = (await param2.insert()) ? true : false;
     }
     if (s1 && s2) {
         await interaction.editReply(
@@ -115,45 +115,46 @@ async function setupCommands(
     // If an insert failed
     await interaction.editReply(`Les salons n'ont pas pu être ajouté.`);
     console.log(param);
-    console.log(param.delete());
+    console.log(await param.delete());
     console.log(param2);
-    console.log(param2.delete());
+    console.log(await param2.delete());
+}
+
+async function data() {
+    const settlements = await getSettlementsHelper(__dirname, true);
+    return new SlashCommandBuilder()
+        .setName("setup_commandes")
+        .setDescription(
+            "Définir le salon dans lequel les commandes seront gérées.",
+        )
+        .addChannelOption((option) =>
+            option
+                .setName("panel")
+                .setDescription("Panel des commandes disponibles")
+                .setRequired(true)
+                .addChannelTypes(ChannelType.GuildText),
+        )
+        .addChannelOption((option) =>
+            option
+                .setName("salon")
+                .setDescription("Salon à choisir (optionnel)")
+                .setRequired(false)
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildForum),
+        )
+        .addStringOption((option) =>
+            option
+                .setName("claim")
+                .setDescription(
+                    "Le claim à choisir (optionnel, si omis = global au serveur)",
+                )
+                .setRequired(false)
+                .addChoices(settlements),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 }
 
 module.exports = {
-    data: () =>
-        new SlashCommandBuilder()
-            .setName("setup_commandes")
-            .setDescription(
-                "Définir le salon dans lequel les commandes seront gérées.",
-            )
-            .addChannelOption((option) =>
-                option
-                    .setName("panel")
-                    .setDescription("Panel des commandes disponibles")
-                    .setRequired(true)
-                    .addChannelTypes(ChannelType.GuildText),
-            )
-            .addChannelOption((option) =>
-                option
-                    .setName("salon")
-                    .setDescription("Salon à choisir (optionnel)")
-                    .setRequired(false)
-                    .addChannelTypes(
-                        ChannelType.GuildText,
-                        ChannelType.GuildForum,
-                    ),
-            )
-            .addStringOption((option) =>
-                option
-                    .setName("claim")
-                    .setDescription(
-                        "Le claim à choisir (optionnel, si omis = global au serveur)",
-                    )
-                    .setRequired(false)
-                    .addChoices(getSettlementsHelper(__dirname, true)),
-            )
-            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    data: data,
 
     execute: setupCommands,
     help: primaryEmbed({

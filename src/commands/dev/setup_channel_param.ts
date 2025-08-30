@@ -37,7 +37,7 @@ export async function setupChannelParam(
 
     const claimId = interaction.options.getString("claim");
     let setl: Settlement | null = null;
-    if (claimId) setl = Settlement.get({ keys: "id", values: claimId });
+    if (claimId) setl = await Settlement.get({ keys: "id", values: claimId });
     if (!setl && claimId) {
         await interaction.editReply("Claim pas trouvé !");
         return;
@@ -49,7 +49,7 @@ export async function setupChannelParam(
     param.command_name = commandName;
     param.command_param = commandParam;
     param.settlement_id = setl?.id ?? null;
-    if (param.insert())
+    if (await param.insert())
         await interaction.editReply(
             `Succesfully added param ${commandParam} for command ${commandName} as ${channelId}.`,
         );

@@ -27,7 +27,7 @@ setsid ./scripts/start_tsc.sh < /dev/null > tsc-watch.log 2>&1 &
 cp -r .env src/data dist/
 
 # If stopping the container: cleanup compiler
-CONTAINER_NAME="kof-bot"
+CONTAINER_NAME="notary"
 
 setsid ./scripts/tsc_stopper.sh "$CONTAINER_NAME" < /dev/null &
 

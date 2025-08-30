@@ -33,8 +33,10 @@ export const getGuildId = (dirName: string): string =>
     (dirName === "dev" ? process.env.DEV_GUILD_ID : process.env.GUILD_ID) ??
     "0";
 
-export function getProfessionsStringSelectCommandArg(): APIApplicationCommandOptionChoice<string>[] {
-    const ps = Profession.fetch();
+export async function getProfessionsStringSelectCommandArg(): Promise<
+    APIApplicationCommandOptionChoice<string>[]
+> {
+    const ps = await Profession.fetch();
     if (!ps)
         return [
             { name: "error:no_profession_found", value: "no_profession_found" },
@@ -44,8 +46,10 @@ export function getProfessionsStringSelectCommandArg(): APIApplicationCommandOpt
     });
 }
 
-export function getProfessionsStringSelectMessageComp(): APISelectMenuOption[] {
-    const ps = Profession.fetch();
+export async function getProfessionsStringSelectMessageComp(): Promise<
+    APISelectMenuOption[]
+> {
+    const ps = await Profession.fetch();
     if (!ps)
         return [
             {
@@ -75,31 +79,30 @@ export function getProfessionsStringSelectMessageComp(): APISelectMenuOption[] {
 
 // For the following 3 functions:
 // dir: true means guildId is actually the __dirname to get the guild id from
-export function getCommandsHelper(
+export async function getCommandsHelper(
     guildId: string,
     dir?: boolean,
-): { name: string; value: string; args?: string[] | undefined }[] {
+): Promise<{ name: string; value: string; args?: string[] | undefined }[]> {
     if (dir) guildId = getGuildId(dirName(guildId));
     const commands = getGuildCommands(guildId);
-    return [
-        ...commands.keys().map((k: string) => {
-            const data =
-                commands.get(k)?.data ??
-                new SlashCommandBuilder().setName("Unknown");
-            return {
-                name: k,
-                value: k,
-                args: [
-                    ...(typeof data === "function" ? data() : data)
-                        .toJSON()
-                        .options!.map(
-                            (option) =>
-                                `${option.required ? "**\\***" : ""}${option.name}`,
-                        ),
-                ],
-            };
-        }),
-    ];
+    const promises = commands.keys().map(async (k: string) => {
+        const data =
+            commands.get(k)?.data ??
+            new SlashCommandBuilder().setName("Unknown");
+        return {
+            name: k,
+            value: k,
+            args: [
+                ...((typeof data === "function" ? await data() : data)
+                    .toJSON()
+                    .options?.map(
+                        (option) =>
+                            `${option.required ? "**\\***" : ""}${option.name}`,
+                    ) ?? []),
+            ],
+        };
+    });
+    return await Promise.all(promises);
 }
 
 export function getTasksHelper(
@@ -115,12 +118,15 @@ export function getTasksHelper(
     ];
 }
 
-export function getSettlementsHelper(
+export async function getSettlementsHelper(
     guildId: string,
     dir?: boolean,
-): { name: string; value: string }[] {
+): Promise<{ name: string; value: string }[]> {
     if (dir) guildId = getGuildId(dirName(guildId));
-    const claims = Settlement.fetchArray({ keys: "guild_id", values: guildId });
+    const claims = await Settlement.fetchArray({
+        keys: "guild_id",
+        values: guildId,
+    });
     return claims.map((s: Settlement) => {
         return {
             name: s.s_name,
@@ -344,7 +350,7 @@ export async function updateSkills(
     if (typeof user === "string") {
         const usr = new User();
         usr.id = user;
-        if (!usr.sync()) {
+        if (!(await usr.sync())) {
             console.error(`[ERROR] updateSkills: DB error on user sync.`);
             return {
                 success: false,
@@ -373,7 +379,7 @@ export async function updateSkills(
         };
 
     user.last_updated_skills = currTime;
-    if (!user.update()) {
+    if (!(await user.update())) {
         console.error(`[ERROR] updateSkills: DB error on user update.`);
         return {
             success: false,
@@ -419,7 +425,7 @@ export async function updateSkills(
         const data: Data = json.player;
 
         const skills: Map<string, string> = new Map();
-        const known_professions: string[] = Profession.fetchArray().map(
+        const known_professions: string[] = (await Profession.fetchArray()).map(
             (p) => p.p_name,
         );
         Object.entries(data.skillMap as skillMap)
@@ -437,7 +443,7 @@ export async function updateSkills(
             }) // TOKNOW: Level calc is approximative
             .filter((sk) => known_professions.includes(sk.profession_name));
 
-        experience.forEach((e) => {
+        for (const e of experience) {
             const sk = new Skill();
             // PKs
             sk.user_id = user.id;
@@ -446,18 +452,18 @@ export async function updateSkills(
             sk.level = e.level;
             sk.xp = e.xp;
 
-            if (!sk.update()) {
+            if (!(await sk.update())) {
                 console.warn(
                     `[WARN] update skills: couldn't update skill ${sk.profession_name} for ${user.player_username}.\nAttempting insert...`,
                 );
-                if (!sk.insert())
+                if (!(await sk.insert()))
                     console.warn(
                         `[WARN] update skills: couldn't insert either.`,
                     );
                 // else console.log(sk);
             }
             // else console.log(sk);
-        });
+        }
     } catch (err) {
         console.error(`[ERROR] updateSkills: error on reading data.`, err);
         return {
@@ -517,7 +523,10 @@ export async function updateGsheetsSkills() {
     console.time("fetch");
     const rows = await sheet.getRows({ offset: 0, limit: 100 });
 
-    const users = User.fetchArray({ keys: "player_id", values: IS_NOT_NULL });
+    const users = await User.fetchArray({
+        keys: "player_id",
+        values: IS_NOT_NULL,
+    });
     console.timeEnd("fetch");
 
     console.time("processing");
@@ -555,17 +564,17 @@ export async function updateGsheetsSkills() {
             nestedObject.Secondaire,
             nestedObject.Bonus,
         ];
-        const pnames = Profession.fetchArray().map((p) => p.p_name);
+        const pnames = (await Profession.fetchArray()).map((p) => p.p_name);
 
         let str: string = "";
-        // Now handle batch update logic
-        skills.forEach((sk, i) => {
+        for (let i = 0; i < skills.length; i++) {
+            const sk = skills[i];
             if (pnames.includes(sk)) {
                 const colIndex = headerRow.indexOf(`LvL${i + 1}`);
                 if (colIndex === -1) return;
 
                 const cell = sheet.getCell(rowIndex + 1, colIndex); // +1 to skip header row
-                const skill = Skill.get({
+                const skill = await Skill.get({
                     keys: ["user_id", "profession_name"],
                     values: [user.id, sk],
                 });
@@ -575,7 +584,7 @@ export async function updateGsheetsSkills() {
                     updates++;
                 }
             }
-        });
+        }
 
         if (str) console.log(`updating for user ${user.player_username}` + str);
     }
@@ -588,18 +597,18 @@ export async function updateGsheetsSkills() {
 const _emojisSkillsMap = new Map<string, string>();
 const _kindSkillsMap = new Map<string, SkillKind>();
 
-export function getEmoji(skill: string) {
+export async function getEmoji(skill: string) {
     if (_emojisSkillsMap.size === 0)
-        Profession.fetchArray().forEach((p) =>
+        (await Profession.fetchArray()).forEach((p) =>
             _emojisSkillsMap.set(p.p_name, p.emoji),
         );
 
     return _emojisSkillsMap.get(skill);
 }
 
-export function getKind(skill: string): SkillKind {
+export async function getKind(skill: string): Promise<SkillKind> {
     if (_kindSkillsMap.size === 0)
-        Profession.fetchArray().forEach((p) =>
+        (await Profession.fetchArray()).forEach((p) =>
             _kindSkillsMap.set(p.p_name, p.kind as SkillKind),
         );
 

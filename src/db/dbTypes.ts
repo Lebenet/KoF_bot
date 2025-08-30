@@ -1,13 +1,17 @@
 // UNFINISHED: simple ORM attempt
 
 import { APIEmbedField } from "discord.js";
-import { db } from "./dbConn";
-import Database from "better-sqlite3";
+import { db as getDb } from "./dbConn";
 import { getParisDatetimeSQLiteSafe } from "../utils/taskUtils";
 import { getEmoji } from "../utils/discordUtils";
 import { sendCommands } from "../utils/commandLoader";
+import { ResultRecord, ResultRow } from "ts-postgres";
+
+const db = () => getDb();
 
 export const relaodDummyDbTypes = "...";
+
+export type DbValue = number | bigint | string | boolean;
 
 export type DbOptionsValue =
     | number
@@ -68,11 +72,11 @@ export class Model {
 
     private static sanitize(
         v: number | bigint | string | boolean | Date,
-    ): number | string {
-        if (["number", "string"].includes(typeof v))
-            return v as number | string;
+    ): DbValue {
+        if (["number", "string", "boolean"].includes(typeof v))
+            return v as number | string | boolean;
         if (typeof v === "bigint") return `${v}`;
-        if (typeof v === "boolean") return v ? 1 : 0;
+        //if (typeof v === "boolean") return v ? 1 : 0;
         if (v instanceof Date) return getParisDatetimeSQLiteSafe(v);
         console.log(v, typeof v);
         throw new Error("Unreachable exception");
@@ -82,13 +86,15 @@ export class Model {
         keys?: null | string | string[],
         values?: null | DbOptionsValue | DbOptionsValue[],
         noNull?: boolean | null,
-    ): { whereClause: string; values: (string | number | bigint)[] } {
+    ): { whereClause: string; values: DbValue[] } {
         if (!keys || !values) return { whereClause: "", values: [] };
         if (!Array.isArray(keys)) keys = [keys];
         if (!Array.isArray(values)) values = [values];
 
-        const retVals: (string | number | bigint)[] = [];
+        const retVals: DbValue[] = [];
         let str = "WHERE ";
+
+        let j = 1;
 
         str += keys
             .map((k, i) => {
@@ -103,17 +109,17 @@ export class Model {
                 } else if (typeof v === "string" && /^\s*LIKE\s+/i.test(v)) {
                     const pattern = v.replace(/^\s*LIKE\s+/i, "");
                     retVals.push(pattern);
-                    return `${k} LIKE ?`;
+                    return `${k} LIKE $${j++}`;
                 } else if (
                     typeof v === "string" &&
                     /^\s*NOT\s+LIKE\s+/i.test(v)
                 ) {
                     const pattern = v.replace(/^\s*NOT\s+LIKE\s+/i, "");
                     retVals.push(pattern);
-                    return `${k} NOT LIKE ?`;
+                    return `${k} NOT LIKE $${j++}`;
                 } else if (Model.isSafeDBValue(v)) {
                     retVals.push(Model.sanitize(v!));
-                    return `${k} = ?`;
+                    return `${k} = $${j++}`;
                 } else
                     throw new Error(
                         `[DB] Build where clause: unsafe value for key ${k} (${v})`,
@@ -124,36 +130,47 @@ export class Model {
         return { whereClause: str, values: retVals };
     }
 
-    public static getPrimaryKeys(table: string): string[] {
+    public static async getPrimaryKeys(table: string): Promise<string[]> {
         if (!Model._primaryKeysCache.has(table)) {
-            const columns: any = db.pragma(`table_info(${table})`);
-            const pkColumns = columns.filter((col: any) => col.pk > 0);
+            const query = `
+                SELECT kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                  AND tc.table_schema = kcu.table_schema
+                WHERE tc.constraint_type = 'PRIMARY KEY'
+                  AND tc.table_name = $1
+                  AND tc.table_schema = 'public'
+                ORDER BY kcu.ordinal_position;
+            `;
+
+            const result = await db().query(query, [table]);
+            const pkColumns = Array.from(result).map(
+                (row) => row.get("column_name") as string,
+            );
 
             if (pkColumns.length === 0) {
                 throw new Error(`No primary key found for table ${table}`);
             }
 
-            Model._primaryKeysCache.set(
-                table,
-                pkColumns.map((col: any) => col.name),
-            );
+            Model._primaryKeysCache.set(table, pkColumns);
         }
 
         return Model._primaryKeysCache.get(table)!;
     }
 
-    private assign(row: any) {
+    private assign(row: ResultRecord<any> | ResultRow<any>): void {
         // console.log(row);
-        for (const key in row) {
-            const v = row[key];
+        for (const key in row.keys()) {
+            const v = row.get(key);
             if (!this.fieldTypes || !this.fieldTypes[key]) {
                 this[key] = v;
                 continue;
             }
             switch (this.fieldTypes[key]) {
-                case "boolean":
-                    this[key] = v === 1 || v === "1";
-                    break;
+                //case "boolean":
+                //    this[key] = v === 1 || v === "1";
+                //    break;
                 case "Date":
                     this[key] = v ? new Date(v) : v;
                     break;
@@ -163,10 +180,10 @@ export class Model {
         }
     }
 
-    private static selectQuery<T extends typeof Model>(
+    private static async selectQuery<T extends typeof Model>(
         this: T,
         options?: DbOptions | null,
-    ): any[] {
+    ): Promise<ResultRow<T>[]> {
         // Set query parameters
         const table =
             options && options.table != null ? options.table : `${this.name}s`;
@@ -180,17 +197,18 @@ export class Model {
         );
         const sql = `SELECT * FROM ${table} ${whereClause} ${limit}`;
 
-        return db.prepare(sql).all(...values);
+        if (!db) throw new Error("DB not initialized");
+        return (await db().query<T>(sql, values)).rows;
     }
 
     // Get one or all of type from database that match a where clause
     // Number of keys must match number of values
-    public static fetch<T extends typeof Model>(
+    public static async fetch<T extends typeof Model>(
         this: T,
         options?: DbOptions | null,
-    ): InstanceType<T>[] | InstanceType<T> | null {
+    ): Promise<InstanceType<T>[] | InstanceType<T> | null> {
         // Fetch data
-        const rows: unknown[] = this.selectQuery(options);
+        const rows: ResultRow<T>[] = await this.selectQuery(options);
 
         // Build instances
         if (!rows || rows.length === 0)
@@ -207,35 +225,35 @@ export class Model {
         return instances.length === 1 ? instances[0] : instances;
     }
 
-    public static fetchArray<T extends typeof Model>(
+    public static async fetchArray<T extends typeof Model>(
         this: T,
         options?: DbOptions | null,
-    ): InstanceType<T>[] {
+    ): Promise<InstanceType<T>[]> {
         const opts: DbOptions = options ?? {};
         opts.array = true;
-        return this.fetch(opts) as InstanceType<T>[];
+        return (await this.fetch(opts)) as InstanceType<T>[];
     }
 
-    public static get<T extends typeof Model>(
+    public static async get<T extends typeof Model>(
         this: T,
         options?: DbOptions | null,
-    ): InstanceType<T> | null {
+    ): Promise<InstanceType<T> | null> {
         const opts: DbOptions = options ?? {};
         opts.limit = 1;
-        return this.fetch(opts) as InstanceType<T> | null;
+        return (await this.fetch(opts)) as InstanceType<T> | null;
     }
 
     // Get new data from database relative to this specific instance
-    public sync(): boolean {
+    public async sync(): Promise<boolean> {
         const table = this.table;
-        const pks: string[] = Model.getPrimaryKeys(table);
+        const pks: string[] = await Model.getPrimaryKeys(table);
 
         const values = pks.map(
             (k: string): number | bigint | string | Date => this[k],
         );
 
         try {
-            const row: any[] = this.ctor.selectQuery({
+            const row = await this.ctor.selectQuery({
                 keys: pks,
                 values: values,
                 table: table,
@@ -257,12 +275,12 @@ export class Model {
     }
 
     // Update database with new data of this new instance
-    public update(): boolean {
+    public async update(): Promise<boolean> {
         const table = this.table;
 
         // Set keys
         // Primary keys (fetched from DB)
-        const pks: string[] = Model.getPrimaryKeys(table);
+        const pks: string[] = await Model.getPrimaryKeys(table);
         if (pks.length === 0) return false;
 
         // Unsafe or virtual user-defined fields
@@ -305,25 +323,24 @@ export class Model {
         )
             return false;
 
+        let j = 1;
         // Build SET clause
         const setClause: string = uks
             .map((k: string): string =>
-                this[k] === null ? `${k} = NULL` : `${k} = ?`,
+                this[k] === null ? `${k} = NULL` : `${k} = $${j++}`,
             )
             .join(", ");
 
         // Build WHERE clause
         const whereClause: string = pks
-            .map((k: string): string => `${k} = ?`)
+            .map((k: string): string => `${k} = $${j++}`)
             .join(" AND ");
 
-        const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
+        const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause} RETURNING *;`;
 
         try {
-            const res: Database.RunResult = db
-                .prepare(sql)
-                .run(...values, ...pkValues);
-            return res.changes === 1;
+            const res = await db().query(sql, [...values, ...pkValues]);
+            return res.rows.length === 1;
         } catch (err) {
             console.error(`[DB] Update: something went wrong\n`, err);
             return false;
@@ -331,7 +348,7 @@ export class Model {
     }
 
     // Create a new row in the corresponding table, and returns the associated instance
-    public insert(): this | undefined {
+    public async insert(): Promise<this | undefined> {
         if (this._inserted) return this; // Can only insert once (Primary Unique Key Constraint)
         const table = this.table;
 
@@ -358,21 +375,24 @@ export class Model {
 
         if (fields.length === 0 || values.length !== fields.length) return;
 
-        const placeholders = fields.map(() => "?").join(", ");
+        let j = 1;
+        const placeholders = fields.map(() => `$${j++}`).join(", ");
         const columns = fields.join(", ");
 
-        const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
+        let sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
+        if (Object.keys(this).includes("id") && !this["id"])
+            sql += " RETURNING id";
+        sql += ";";
 
         try {
-            const res: Database.RunResult = db.prepare(sql).run(...values);
+            const res = await db().query(sql, values);
+            if (res.rows.length !== 1) return undefined;
             this._inserted = true;
 
             if (Object.keys(this).includes("id") && !this["id"]) {
-                this["id"] = (
-                    db.prepare("SELECT last_insert_rowid()").get() as any
-                )["last_insert_rowid()"];
+                this["id"] = res.rows[0].get("id");
             }
-            return res.changes === 1 ? this : undefined;
+            return this;
         } catch (err) {
             console.error(`[DB] Insert: something went wrong\n`, err);
             return;
@@ -380,11 +400,11 @@ export class Model {
     }
 
     // Remove entry from database
-    public delete(): boolean {
+    public async delete(): Promise<boolean> {
         const table = this.table;
 
         // Delete based on primary keys
-        const pks: string[] = Model.getPrimaryKeys(table);
+        const pks: string[] = await Model.getPrimaryKeys(table);
         const values: any[] = [];
         pks.forEach((k: string): any => {
             const v: any = this[k];
@@ -394,13 +414,14 @@ export class Model {
         // Safeguard (if user did some wonky stuff with the class attributes)
         if (pks.length === 0 || pks.length != values.length) return false;
 
+        let j = 1;
         const whereClause: string = pks
-            .map((k: string): string => `${k} = ?`)
+            .map((k: string): string => `${k} = $${j++}`)
             .join(" AND ");
-        const sql: string = `DELETE FROM ${table} WHERE ${whereClause}`;
+        const sql: string = `DELETE FROM ${table} WHERE ${whereClause} RETURNING *;`;
         try {
-            const res: Database.RunResult = db.prepare(sql).run(...values);
-            return res.changes > 0;
+            const res = await db().query(sql, values);
+            return res.rows.length > 0;
         } catch (err) {
             console.error(`[DB] Delete: something went wrong\n`, err);
             return false;
@@ -408,7 +429,7 @@ export class Model {
     }
 
     // Check if an instance exists in the database
-    public exists(): boolean {
+    public async exists(): Promise<boolean> {
         const fields = Object.keys(this).filter(
             (k: string): boolean =>
                 typeof this[k] !== "function" &&
@@ -424,14 +445,15 @@ export class Model {
             .filter((k) => this[k] !== null)
             .map((k) => Model.sanitize(this[k]));
 
+        let j = 1;
         const whereClause = fields
-            .map((k) => (this[k] === null ? `${k} IS NULL` : `${k} = ?`))
+            .map((k) => (this[k] === null ? `${k} IS NULL` : `${k} = $${j++}`))
             .join(" AND ");
         const sql = `SELECT 1 FROM ${this.table} WHERE ${whereClause} LIMIT 1`;
 
         try {
-            const row = db.prepare(sql).get(...values);
-            return !!row;
+            const res = await db().query(sql, values);
+            return res.rows.length > 0;
         } catch (err) {
             console.error(`[DB] Exists check failed:\n`, err);
             return false;
@@ -447,18 +469,23 @@ export class User extends Model {
     public bot_perm!: number | string;
     public last_updated_skills?: Date | null;
 
-    public static ensureUserExists(
+    public static async ensureUserExists(
         userId: string,
         username: string,
         botPerm: number | bigint = 0,
     ) {
-        db.prepare(
-            `
-			INSERT INTO Users(id, username, bot_perm)
-			VALUES (?, ?, ?)
-			ON CONFLICT(id) DO NOTHING;
-		`,
-        ).run(userId, username, botPerm);
+        try {
+            await db().query(
+                `
+                INSERT INTO Users(id, username, bot_perm)
+                VALUES (?, ?, ?)
+                ON CONFLICT(id) DO NOTHING;
+            `,
+                [userId, username, botPerm],
+            );
+        } catch (err) {
+            console.error(err);
+        }
     }
 
     override fieldTypes: Record<string, FieldType> = {
@@ -487,12 +514,12 @@ export class ChannelParam extends Model {
         { param: ChannelParam; lastEdited: number }
     >();
 
-    public static getParam(
+    public static async getParam(
         guildId: string,
         commandName: string,
         paramName: string,
         settlementId?: number | bigint | string | null,
-    ): ChannelParam | null {
+    ): Promise<ChannelParam | null> {
         // settlementId safety
         settlementId ??= null;
 
@@ -528,7 +555,7 @@ export class ChannelParam extends Model {
         ];
 
         // Get res
-        const resQ = ChannelParam.get({
+        const resQ = await ChannelParam.get({
             keys: keys,
             values: values,
         });
@@ -548,8 +575,8 @@ export class ChannelParam extends Model {
         return resQ;
     }
 
-    public override insert(): this | undefined {
-        const res = super.insert();
+    public override async insert(): Promise<this | undefined> {
+        const res = await super.insert();
         if (res && this.guild_id && this.command_name && this.command_param) {
             const keys: _cpCacheKeysType = [
                 this.guild_id,
@@ -565,8 +592,8 @@ export class ChannelParam extends Model {
         return res;
     }
 
-    public override update(): boolean {
-        const res = super.update();
+    public override async update(): Promise<boolean> {
+        const res = await super.update();
         if (res && this.guild_id && this.command_name && this.command_param) {
             const keys: _cpCacheKeysType = [
                 this.guild_id,
@@ -582,8 +609,8 @@ export class ChannelParam extends Model {
         return res;
     }
 
-    public override delete(): boolean {
-        const res = super.delete();
+    public override async delete(): Promise<boolean> {
+        const res = await super.delete();
         if (res && this.guild_id && this.command_name && this.command_param) {
             const keys: _cpCacheKeysType = [
                 this.guild_id,
@@ -620,10 +647,44 @@ export class Fournisseur extends Model {
         coordinator: "boolean",
     };
 
+    public override async sync(): Promise<boolean> {
+        const res = await super.sync();
+        if (res && this.settlement_id) {
+            this._settlement = await Settlement.get({
+                keys: "id",
+                values: this.settlement_id,
+            });
+        }
+        return res;
+    }
+
+    public override async update(): Promise<boolean> {
+        const res = await super.update();
+        if (res && this.settlement_id) {
+            this._settlement = await Settlement.get({
+                keys: "id",
+                values: this.settlement_id,
+            });
+        }
+        return res;
+    }
+
+    public override async insert(): Promise<this | undefined> {
+        const res = await super.insert();
+        if (res && this.settlement_id) {
+            this._settlement = await Settlement.get({
+                keys: "id",
+                values: this.settlement_id,
+            });
+        }
+        return res;
+    }
+
+    private _settlement?: Settlement | null;
+
+    // Don't forget to sync before using this, or settlement won't be set
     public toString(discord?: boolean): string {
-        const setl = this.settlement_id
-            ? Settlement.get({ keys: "id", values: this.settlement_id })
-            : null;
+        const setl = this._settlement ?? null;
         return discord
             ? `- **${this.coordinator ? "🔧 Coordinateur" : "Fournisseur"}** de __${this.profession_name}__ ${this.settlement_id ? `*(${setl?.s_name})*` : ""}`
             : `${this.coordinator ? "🔧 Coordinateur" : "Fournisseur"} de ${this.profession_name} ${this.settlement_id ? `(${setl?.s_name})` : ""}`;
@@ -700,20 +761,20 @@ export class Settlement extends Model {
     public owner_id!: string | null;
     public member_count!: number;
 
-    public override insert(): this | undefined {
-        const res = super.insert();
+    public override async insert(): Promise<this | undefined> {
+        const res = await super.insert();
         if (res) sendCommands(this.guild_id).catch(console.log);
         return res;
     }
 
-    public override update(): boolean {
-        const res = super.update();
+    public override async update(): Promise<boolean> {
+        const res = await super.update();
         if (res) sendCommands(this.guild_id).catch(console.log);
         return res;
     }
 
-    public override delete(): boolean {
-        const res = super.delete();
+    public override async delete(): Promise<boolean> {
+        const res = await super.delete();
         if (res) sendCommands(this.guild_id).catch(console.log);
         return res;
     }
@@ -879,21 +940,23 @@ export function changeProfs() {
         ["Merchanting", SkillKind.Skill, "Marchand", "💰", 19],
         ["Sailing", SkillKind.Skill, "Navigateur", "⛵", 21],
     ]) {
-        db.prepare(
+        db().query(
             `
             INSERT INTO Professions(p_name, kind, description, emoji, skill_id)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(p_name) DO NOTHING;
-        `,
-        ).run(n, k, d, e, s);
-        db.prepare(
+            `,
+            [n, k, d, e, s],
+        );
+        db().query(
             `UPDATE Professions 
             SET kind = ?, description = ?, emoji = ?, skill_id = ?
             WHERE p_name = ?;`,
-        ).run(k, d, e, s, n);
+            [k, d, e, s, n],
+        );
     }
 }
 
-changeProfs();
+//changeProfs();
 
 //console.log(Profession.fetchArray());

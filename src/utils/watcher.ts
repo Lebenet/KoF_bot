@@ -4,25 +4,25 @@ import path from "path";
 
 const timeoutsMap = new Map<string, NodeJS.Timeout>();
 
-let {
+import {
     initCmdLoad,
     unloadCommand,
     loadCommand,
     sendCommands,
     getCommands,
     getGuildCommands,
-} = require("./commandLoader.js");
+} from "./commandLoader";
 
 let { startTaskRunner, stopTaskRunner } = require("./taskRunner");
 
-let {
+import {
     loadConfig,
     addSingleConfig,
     getConfig,
     lockBot,
     unlockBot,
     deleteSingleConfig,
-} = require("./configLoader");
+} from "./configLoader";
 
 let {
     initTaskLoad,
@@ -84,7 +84,7 @@ function taskWatcherHandler(filePath: string, event: string) {
         );
 }
 
-function commandWatcherHandler(filePath: string, event: string) {
+async function commandWatcherHandler(filePath: string, event: string) {
     // Lock bot to avoid errors during hot-reload (later only lock certain commands, and only per-server)
     lockBot();
 
@@ -101,10 +101,10 @@ function commandWatcherHandler(filePath: string, event: string) {
     switch (event) {
         case "add":
         case "change":
-            loadCommand(file, folders.commands[dir]);
+            await loadCommand(file, folders.commands[dir]);
             break;
         case "unlink":
-            unloadCommand(file, filePath, getGuildCommands(guildId));
+            await unloadCommand(file, filePath, getGuildCommands(guildId));
             break;
         default:
             console.log(`[WARN] Command Watcher: Unhandled event ${event}.`);
@@ -116,8 +116,12 @@ function commandWatcherHandler(filePath: string, event: string) {
         timeoutsMap.set(
             guildId,
             setTimeout(() => {
-                loadCommand("help.js", folders.commands[dir]);
-                sendCommands(guildId);
+                loadCommand("help.js", folders.commands[dir]).catch((err) => {
+                    throw err;
+                });
+                sendCommands(guildId).catch((err) => {
+                    throw err;
+                });
                 console.log(getCommands().toString(guildId));
                 timeoutsMap.delete(guildId);
             }, 1_000),
@@ -131,12 +135,14 @@ function commandWatcherHandler(filePath: string, event: string) {
     unlockBot();
 }
 
+/*
 function reloadUtil(filePath: string) {
     const { file, dir } = getFileDir(filePath);
     const fullPath = require.resolve(path.resolve(path.join(dir, file)));
     delete require.cache[fullPath];
     return require(fullPath);
 }
+*/
 
 function getFileDir(filePath: string) {
     const file = path.basename(filePath);
@@ -166,13 +172,18 @@ export function start() {
     console.log("-========-");
 
     // Load commands
-    initCmdLoad();
-    const commands = getCommands();
-    console.log("commands:\n", commands.toString());
+    initCmdLoad().then(() => {
+        const commands = getCommands();
+        console.log("commands:\n", commands.toString());
 
-    // Register slash commands to discord
-    sendCommands(process.env.DEV_GUILD_ID ?? "");
-    sendCommands(process.env.GUILD_ID ?? "");
+        // Register slash commands to discord
+        sendCommands(process.env.DEV_GUILD_ID ?? "").catch((err) => {
+            throw err;
+        });
+        sendCommands(process.env.GUILD_ID ?? "").catch((err) => {
+            throw err;
+        });
+    });
 
     // Load tasks
     initTaskLoad();
@@ -349,9 +360,21 @@ export function start() {
         });
 
     watcherCmd
-        .on("add", (filePath) => commandWatcherHandler(filePath, "add"))
-        .on("change", (filePath) => commandWatcherHandler(filePath, "change"))
-        .on("unlink", (filePath) => commandWatcherHandler(filePath, "unlink"));
+        .on("add", (filePath) =>
+            commandWatcherHandler(filePath, "add").catch((err) => {
+                throw err;
+            }),
+        )
+        .on("change", (filePath) =>
+            commandWatcherHandler(filePath, "change").catch((err) => {
+                throw err;
+            }),
+        )
+        .on("unlink", (filePath) =>
+            commandWatcherHandler(filePath, "unlink").catch((err) => {
+                throw err;
+            }),
+        );
 
     watcherCfg
         .on("add", (filePath) => {

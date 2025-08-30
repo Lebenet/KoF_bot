@@ -69,14 +69,14 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
         // SUBJECT TO CHANGE IF BITJITA CHANGES; REPLACE WITH ACTUAL DB CONNEXION LATER ON
         const data: any = json.player;
         const playerName = data.username;
-        User.ensureUserExists(
+        await User.ensureUserExists(
             interaction.user.id,
             interaction.user.displayName,
             0,
         );
         const user = new User();
         user.id = interaction.user.id;
-        if (!user.sync()) {
+        if (!(await user.sync())) {
             interaction.editReply("Erreur de DB ! Veuillez réessayer.");
             return;
         }
@@ -88,7 +88,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
         user.player_id = playerId;
         const oldName = user.player_username;
         user.player_username = playerName;
-        if (!user.update()) {
+        if (!(await user.update())) {
             interaction.editReply(
                 "Erreur de DB en ajoutant vos informations (1) ! Veuillez réessayer.",
             );
@@ -110,7 +110,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
         }
 
         user.last_updated_skills = currTime;
-        if (!user.update()) {
+        if (!(await user.update())) {
             interaction.editReply(
                 "Erreur de DB en ajoutant vos informations (2) ! Veuillez réessayer.",
             );
@@ -118,7 +118,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
         }
 
         const skills: Map<string, string> = new Map();
-        const known_professions: string[] = Profession.fetchArray().map(
+        const known_professions: string[] = (await Profession.fetchArray()).map(
             (p) => p.p_name,
         );
         Object.entries(data.skillMap as skillMap)
@@ -136,7 +136,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
             }) // TOKNOW: Level calc is approximative
             .filter((sk) => known_professions.includes(sk.profession_name));
 
-        experience.forEach((e) => {
+        for (const e of experience) {
             const sk = new Skill();
             // PKs
             sk.user_id = interaction.user.id;
@@ -147,7 +147,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
 
             // If skill exists (update)
             if (exists) {
-                if (!sk.update()) {
+                if (!(await sk.update())) {
                     interaction.editReply(
                         `Erreur en updatant votre skill ${sk.profession_name} !`,
                     );
@@ -159,7 +159,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
 
                 // If it doesn't (create)
             } else {
-                if (!sk.insert()) {
+                if (!(await sk.insert())) {
                     interaction.editReply(
                         `Erreur en ajoutant votre skill ${sk.profession_name} !`,
                     );
@@ -169,7 +169,7 @@ async function link(interaction: ChatInputCommandInteraction, config: Config) {
                 }
                 // else console.log(sk);
             }
-        });
+        }
 
         interaction.editReply(
             "**Votre profil a été link** !\nVous pouvez dès à présent faire **`/profil`** pour afficher des informations à votre sujet.",

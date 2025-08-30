@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { Client as Database } from "ts-postgres";
 import {
     Interaction,
     ChatInputCommandInteraction,
@@ -63,7 +63,7 @@ type Tasks = {
 type Config = {
     locked: boolean;
     bot: Client;
-    db: Database.Database;
+    db: Database;
     admins: Array<string>;
     [key: string]: any;
 };

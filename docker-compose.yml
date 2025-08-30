@@ -1,13 +1,40 @@
 services:
     kof-bot:
+        init: true
+        container_name: notary
         build:
             context: .
-            dockerfile: Dockerfile
-        image: kof-bot:latest
-        container_name: kof-bot
-        environment:
-            - CHOKIDAR_USEPOLLING=true
+            dockerfile: ./Dockerfile
         volumes:
             - ./dist:/usr/bot/dist
-            - ./db:/usr/bot/db
+        image: kof-bot:latest
+        env_file:
+            - .env
+        environment:
+            TZ: "Europe/Paris"
+            PGTZ: "Europe/Paris"
+            CHOKIDAR_USEPOLLING: "true"
         restart: unless-stopped
+        depends_on:
+            - postgres-db
+
+    postgres-db:
+        image: postgres:17
+        container_name: postgres-db
+        ports:
+            - "127.0.0.1:5432:5432"
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+        env_file:
+            - .env
+        environment:
+            TZ: "Europe/Paris"
+            PGTZ: "Europe/Paris"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+            interval: 2s
+            retries: 10
+        restart: unless-stopped
+
+volumes:
+    postgres-data:

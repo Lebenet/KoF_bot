@@ -20,15 +20,15 @@ module.exports = {
     ) => {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        User.ensureUserExists(
+        await User.ensureUserExists(
             interaction.user.id,
             interaction.user.displayName,
             0,
         );
-        const user: User = User.get({
+        const user: User = (await User.get({
             keys: "id",
             values: interaction.user.id,
-        }) as User;
+        })) as User;
         if (user.player_id === null) {
             await interaction.editReply("Vous n'êtes pas link !");
             return;
@@ -36,12 +36,14 @@ module.exports = {
 
         user.player_id = null;
         user.player_username = "empty_game_username";
-        if (!user.update()) {
+        if (!(await user.update())) {
             await interaction.reply("Erreur de DB, pas réussi à vous unlink !");
             return;
         }
 
-        config.db.prepare("DELETE FROM Skills WHERE user_id = ?;").run(user.id);
+        await config.db.query("DELETE FROM Skills WHERE user_id = $1;", [
+            user.id,
+        ]);
         interaction.editReply("Réussi.").catch();
         setTimeout(() => interaction.deleteReply().catch(), 5_000);
     },

@@ -29,7 +29,7 @@ async function addSettlement(
 
     // Check for duplicate
     if (
-        Settlement.get({
+        await Settlement.get({
             keys: ["guild_id", "s_name"],
             values: [interaction.guildId!, name],
         })
@@ -41,7 +41,7 @@ async function addSettlement(
         return;
     }
 
-    DbUser.ensureUserExists(owner.id, owner.displayName);
+    await DbUser.ensureUserExists(owner.id, owner.displayName);
 
     // Initialise object
     const setl = new Settlement();
@@ -50,7 +50,7 @@ async function addSettlement(
     setl.owner_id = owner.id;
 
     // Try to insert
-    if (!setl.insert()) {
+    if (!(await setl.insert())) {
         interaction.reply({
             content: "Erreur de DB, le claim n'a pas pu être ajouté à la DB!",
             flags: MessageFlags.Ephemeral,

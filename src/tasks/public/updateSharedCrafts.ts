@@ -79,18 +79,26 @@ const colors = new Map<number, HexColorString>([
     [10, `#${"97afbf"}`],
 ]);
 
-function getCraftEmbed(
+async function getCraftEmbed(
     craft: SharedCraft,
     tier: number,
     skills: LevelRequirements[],
 ) {
     const progress: number = craft.progress / craft.total;
-    const profs = skills.map((sk) =>
-        Profession.get({
-            keys: "skill_id",
-            values: sk.skill_id,
-        }),
+    let profs: (Profession | null)[];
+    let promises = skills.map(
+        async (sk): Promise<Profession | null> =>
+            await Profession.get({
+                keys: "skill_id",
+                values: sk.skill_id,
+            }),
     );
+
+    await Promise.all(promises)
+        .then((res) => (profs = res))
+        .catch((err) => {
+            throw new Error(err);
+        });
 
     let em: string | undefined;
     const sksf: string = skills
@@ -126,7 +134,7 @@ function getCraftEmbed(
 }
 
 async function update(_data: TaskData, config: Config) {
-    const statuses = SharedCraftsStatus.fetchArray();
+    const statuses = await SharedCraftsStatus.fetchArray();
     const chanManager: ChannelManager = config.bot.channels;
 
     for (const status of statuses) {
@@ -146,10 +154,12 @@ async function update(_data: TaskData, config: Config) {
         const req: Request = await res.json();
 
         const existing: Map<string, SharedCraft> = new Map();
-        SharedCraft.fetchArray({
-            keys: "status_id",
-            values: status.id,
-        }).forEach((sc) => existing.set(sc.entityId, sc));
+        (
+            await SharedCraft.fetchArray({
+                keys: "status_id",
+                values: status.id,
+            })
+        ).forEach((sc) => existing.set(sc.entityId, sc));
 
         const items = new Map<number, Item>();
         req.cargos.forEach((c) => items.set(c.id, c));
@@ -202,7 +212,7 @@ async function update(_data: TaskData, config: Config) {
             const msg = {
                 content: "",
                 embeds: [
-                    getCraftEmbed(
+                    await getCraftEmbed(
                         dbcraft,
                         item?.tier ?? 1,
                         craft.levelRequirements,
@@ -211,8 +221,9 @@ async function update(_data: TaskData, config: Config) {
             };
 
             if (message) {
-                if (dbcraft._inserted && !dbcraft.update()) return;
-                else if (!dbcraft._inserted && !dbcraft.insert()) return;
+                if (dbcraft._inserted && !(await dbcraft.update())) return;
+                else if (!dbcraft._inserted && !(await dbcraft.insert()))
+                    return;
                 message.edit(msg).catch();
                 c++;
                 return;
@@ -222,8 +233,8 @@ async function update(_data: TaskData, config: Config) {
             dbcraft.message_id = message.id;
 
             if (
-                (dbcraft._inserted && !dbcraft.update()) ||
-                (!dbcraft._inserted && !dbcraft.insert())
+                (dbcraft._inserted && !(await dbcraft.update())) ||
+                (!dbcraft._inserted && !(await dbcraft.insert()))
             ) {
                 message.delete().catch();
                 return;
@@ -238,7 +249,7 @@ async function update(_data: TaskData, config: Config) {
 
         const ids: string[] = [
             ...existing.values().map((sc) => {
-                sc.delete();
+                sc.delete().catch();
                 return sc.message_id;
             }),
         ];

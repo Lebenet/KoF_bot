@@ -61,14 +61,14 @@ async function setupCrafts(
     ]);
     const del: boolean = interaction.options.getBoolean("del") ?? false;
 
-    let setup: SharedCraftsStatus | null = SharedCraftsStatus.get({
+    let setup: SharedCraftsStatus | null = await SharedCraftsStatus.get({
         keys: ["guild_id", "channel_id", "claim_id"],
         values: [interaction.guildId, chan.id, claimId],
     });
 
     if (setup !== null) {
         if (del) {
-            if (!setup.delete()) {
+            if (!(await setup.delete())) {
                 await interaction.editReply(
                     "Failed to delete, please try again !",
                 );
@@ -91,7 +91,7 @@ async function setupCrafts(
     setup.channel_id = chan.id;
     setup.claim_id = claimId;
 
-    if (!setup.insert()) {
+    if (!(await setup.insert())) {
         await interaction.editReply("Failed to setup, DB error !");
         return;
     }
