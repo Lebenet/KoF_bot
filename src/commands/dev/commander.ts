@@ -233,6 +233,7 @@ async function initHandler(
     if (chest) command.chest = chest;
     if (description) command.description = description;
     if (setlId !== -1) command.settlement_id = setlId;
+    else command.settlement_id = null;
     command.self_supplied = self_supplied;
     command.author_id = interaction.user.id;
 
@@ -331,7 +332,7 @@ async function initHandler(
             components: [row1, row2, row3],
         });
 
-        msg.pin();
+        await msg.pin();
 
         command.message_id = msg.id;
         if (!command.update()) {
@@ -346,7 +347,7 @@ async function initHandler(
         await interaction.editReply(
             `Votre commande peut être __complétée__ dans **<#${thread.id}>** !`,
         );
-        setTimeout(() => interaction.deleteReply(), 15_000);
+        setTimeout(() => interaction.deleteReply().catch(), 15_000);
     }
 }
 
@@ -608,7 +609,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         interaction
             .editReply("Erreur de database! L'interaction a échouée.")
             .catch(console.log);
-        panelMsg.delete();
+        await panelMsg.delete();
         return;
     }
 
@@ -1120,9 +1121,9 @@ async function addItemsHandler(
 
         item.message_id = msg.id;
         if (!item.update()) {
-            msg.delete();
+            await msg.delete();
             item.delete();
-        } else msg.pin();
+        } else await msg.pin();
     });
 
     // Update panel message
