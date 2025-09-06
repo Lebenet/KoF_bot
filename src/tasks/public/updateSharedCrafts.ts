@@ -206,9 +206,15 @@ async function update(_data: TaskData, config: Config) {
                         dbcraft,
                         item?.tier ?? 1,
                         craft.levelRequirements,
+                    ).setThumbnail(
+                        item
+                            ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName.replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/, "$1")}.webp`
+                            : null,
                     ),
                 ],
             };
+            // console.log(item?.iconAssetName ?? "no item ?");
+            // console.log(item ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName.replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/,"$1")}.webp` : "no item ?");
 
             if (message) {
                 if (dbcraft._inserted && !dbcraft.update()) return;
@@ -252,8 +258,8 @@ const data: TaskDataLoad = {
     repeat: 0,
     autoStart: true,
     runOnStart: true,
-    notResetOnReload: true,
-    interval: 15,
+    notResetOnReload: false,
+    interval: -1, //
 };
 
 module.exports = {
