@@ -83,6 +83,7 @@ function getCraftEmbed(
     craft: SharedCraft,
     tier: number,
     skills: LevelRequirements[],
+    claimName: string = "not found",
 ) {
     const progress: number = craft.progress / craft.total;
     const profs = skills.map((sk) =>
@@ -106,7 +107,8 @@ function getCraftEmbed(
     return new EmbedBuilder()
         .setTitle(shortenText(em + " " + craft.item_name, 256))
         .setDescription(
-            `__**skill(s)**__: ${sksf}\n__**building**__: ${craft.crafting_station}`,
+            //    `__**skill(s)**__: ${sksf}\n__**building**__: ${craft.crafting_station}`,
+            `__**skill(s)**__: ${sksf}\n__**claim**__: ${claimName}`,
         )
         .setAuthor({
             name: shortenText(craft.owner_name ?? "author not found", 256),
@@ -206,9 +208,10 @@ async function update(_data: TaskData, config: Config) {
                         dbcraft,
                         item?.tier ?? 1,
                         craft.levelRequirements,
+                        craft.claimName,
                     ).setThumbnail(
                         item
-                            ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName.replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/, "$1")}.webp`
+                            ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName.replace(/\/?GeneratedIcons\/Other\/GeneratedIcons/, "GeneratedIcons/Other").replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/, "$1".replaceAll(/\s/g, ""))}.webp`
                             : null,
                     ),
                 ],
@@ -224,7 +227,12 @@ async function update(_data: TaskData, config: Config) {
                 return;
             }
 
-            message = await channel.send(msg);
+            try {
+                message = await channel.send(msg);
+            } catch (err) {
+                console.log(msg.embeds[0]);
+                throw err;
+            }
             dbcraft.message_id = message.id;
 
             if (
@@ -259,7 +267,7 @@ const data: TaskDataLoad = {
     autoStart: true,
     runOnStart: true,
     notResetOnReload: true,
-    interval: 15, //
+    interval: 15,
 };
 
 module.exports = {
