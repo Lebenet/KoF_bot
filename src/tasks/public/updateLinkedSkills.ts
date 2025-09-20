@@ -5,6 +5,13 @@ import { setTimeout } from "timers/promises";
 import { Config } from "../../utils/configLoader";
 
 async function updateLinkedSkills(data: TaskData, _config: Config) {
+    console.log(
+        process.env.CLIENT_ID,
+        process.env.DEV_GUILD_ID,
+        process.env.GUILD_ID,
+        process.env.SPREADSHEET_ID,
+        process.env.GOOGLE_CREDENTIALS_FILE,
+    );
     // FIXME: update ORM to allow for IS NOT NULL check
     const users = User.fetchArray().filter((u) => u.player_id);
     const len = users.length;
