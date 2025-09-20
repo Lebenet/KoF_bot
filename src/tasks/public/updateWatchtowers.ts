@@ -1,5 +1,15 @@
-import { APIEmbedField, EmbedBuilder, Guild, TextChannel } from "discord.js";
-import { WatchtowerStatus, Empire } from "../../db/dbTypes";
+import {
+    APIEmbedField,
+    Client,
+    EmbedBuilder,
+    Guild,
+    TextChannel,
+} from "discord.js";
+import {
+    WatchtowerStatus,
+    Watchtower as DbWatchtower,
+    Empire,
+} from "../../db/dbTypes";
 import { Config } from "../../utils/configLoader";
 import { TaskData } from "../../utils/taskLoader";
 import { dangerEmbed, primaryEmbed } from "../../utils/discordUtils";
@@ -43,7 +53,12 @@ type Watchtower = {
     siege: Siege[];
 };
 
-function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
+function getEmbeds(
+    en: string,
+    wts: Watchtower[],
+    iu: string,
+    config: Config,
+): EmbedBuilder[] {
     // can be optimised from 3n to n but who cares
     wts.sort((t1, t2) => t1.energy - t2.energy);
     const sieged = wts.filter(
@@ -141,9 +156,55 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
                         60,
                 );
 
+                const newSieged: DbWatchtower = new DbWatchtower();
+                newSieged.id = wt.entityId;
+                newSieged.sieged = true;
+                let isNew = false;
+                if (!newSieged.sync()) {
+                    newSieged.insert();
+                    isNew = true;
+                } else if (!newSieged.sieged) {
+                    newSieged.update();
+                    isNew = true;
+                }
+
+                if (isNew) {
+                    const bot = config.bot;
+                    bot.users
+                        .fetch(process.env.ALERT_ID!)
+                        .then((alert) =>
+                            alert
+                                .send(
+                                    "## =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n" +
+                                        `# NEW SIEGE ALERT (*${wt.nickname} __vs__ ${attacker.empireName}*)\n` +
+                                        `__started at__: <t:${start}:f>\n` +
+                                        "```" +
+                                        `<t:${start}:f>` +
+                                        "```\n" +
+                                        `__attack empty at__: <t:${nowSecs + attackerRemainingSeconds}:f> <t:${nowSecs + attackerRemainingSeconds}:R>\n` +
+                                        "```" +
+                                        `<t:${nowSecs + attackerRemainingSeconds}:f> <t:${nowSecs + attackerRemainingSeconds}:R>` +
+                                        "```\n" +
+                                        `__defense empty at__: <t:${nowSecs + defenderRemainingSeconds}:f> <t:${nowSecs + defenderRemainingSeconds}:R>\n` +
+                                        "```" +
+                                        `<t:${nowSecs + defenderRemainingSeconds}:f> <t:${nowSecs + defenderRemainingSeconds}:R>` +
+                                        "```",
+                                )
+                                .catch(),
+                        )
+                        .catch();
+                }
+
                 return `**${(defender?.energy ?? 0) + wt.energy}** / **${attacker.energy}**: *[**X**: ${Math.round(wt.locationX / 3)}, **Z**: ${Math.round(wt.locationZ / 3)}]*\n- *${wt.nickname} __vs__ ${attacker.empireName}*\n-# Attaque vide: approx. <t:${nowSecs + attackerRemainingSeconds}:f> <t:${nowSecs + attackerRemainingSeconds}:R>\n-# Defense vide: approx. <t:${nowSecs + defenderRemainingSeconds}:f> <t:${nowSecs + defenderRemainingSeconds}:R>\n-# Siege commencé <t:${start}:f>`;
             }
         }
+        const newSieged: DbWatchtower = new DbWatchtower();
+        newSieged.id = wt.entityId;
+        if (newSieged.sync() && newSieged.sieged) {
+            newSieged.sieged = false;
+            newSieged.update();
+        }
+
         return wt.active
             ? `**${wt.energy}**, upkeep: ~${wt.upkeep * 24} /j\n- *${wt.nickname}*`
             : `-# **${wt.energy}**: *${wt.nickname}*`;
@@ -162,6 +223,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
         footerLen,
         timestampLen,
     );
+
     chunkCategory(
         ":white_check_mark: ACTIVES",
         actives.map((wt) => mkStr(wt)),
@@ -169,6 +231,7 @@ function getEmbeds(en: string, wts: Watchtower[], iu: string): EmbedBuilder[] {
         footerLen,
         timestampLen,
     );
+
     chunkCategory(
         ":x: INACTIVES",
         inactives.map((wt) => mkStr(wt)),
@@ -268,6 +331,7 @@ export async function updateWatchtowers(_data: TaskData, config: Config) {
             empire.e_name,
             emp,
             guild.iconURL() ?? config.bot.user!.avatarURL()!,
+            config,
         );
 
         if (embeds.length === 0)

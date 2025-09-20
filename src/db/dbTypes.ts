@@ -748,6 +748,15 @@ export class WatchtowerStatus extends Model {
     public empire_id!: string;
 }
 
+export class Watchtower extends Model {
+    public id!: string;
+    public sieged!: boolean;
+
+    override fieldTypes: Record<string, FieldType> = {
+        sieged: "boolean",
+    };
+}
+
 export class SharedCraftsStatus extends Model {
     public id!: number;
     public guild_id!: string;

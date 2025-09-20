@@ -122,6 +122,11 @@ const tables = [
 		empire_id TEXT NOT NULL REFERENCES Empires(entityId) ON DELETE CASCADE,
 		PRIMARY KEY (guild_id, channel_id, empire_id)
 	);`,
+    // `DROP TABLE IF EXISTS Watchtowers;`,
+    `CREATE TABLE IF NOT EXISTS Watchtowers(
+		id TEXT PRIMARY KEY NOT NULL,
+		sieged BOOLEAN NOT NULL DEFAULT FALSE CHECK (sieged IN (0, 1))
+	);`,
 
     // DO NOT DELETE, ONLY ALTER
     `CREATE TABLE IF NOT EXISTS Professions(

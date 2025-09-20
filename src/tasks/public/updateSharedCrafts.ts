@@ -211,7 +211,16 @@ async function update(_data: TaskData, config: Config) {
                         craft.claimName,
                     ).setThumbnail(
                         item
-                            ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName.replace(/\/?GeneratedIcons\/Other\/GeneratedIcons/, "GeneratedIcons/Other").replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/, "$1".replaceAll(/\s/g, ""))}.webp`
+                            ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName
+                                  .replace(
+                                      /\/?GeneratedIcons\/Other\/GeneratedIcons/,
+                                      "GeneratedIcons/Other",
+                                  )
+                                  .replace(
+                                      /\/?(?:GeneratedIcons)?\/?([^\.]+).*$/,
+                                      "$1",
+                                  )
+                                  .replaceAll(/\s/g, "")}.webp`
                             : null,
                     ),
                 ],
