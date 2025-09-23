@@ -158,12 +158,14 @@ function getEmbeds(
 
                 const newSieged: DbWatchtower = new DbWatchtower();
                 newSieged.id = wt.entityId;
-                newSieged.sieged = true;
+                
                 let isNew = false;
                 if (!newSieged.sync()) {
+                    newSieged.sieged = true;
                     newSieged.insert();
                     isNew = true;
                 } else if (!newSieged.sieged) {
+                    newSieged.sieged = true;
                     newSieged.update();
                     isNew = true;
                 }
