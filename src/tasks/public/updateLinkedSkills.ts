@@ -11,8 +11,8 @@ async function updateLinkedSkills(data: TaskData, _config: Config) {
     let c = 0,
         vc = 0;
 
-    // update skills by batch of 50 per 5 seconds
-    const interval = 5_000; // 5s
+    // update skills by batch of 50 per 15 seconds (200/min, rate limit is 250)
+    const interval = 15_000; // 15s
 
     while (c < len) {
         // Get next slice (max 50)
