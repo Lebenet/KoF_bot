@@ -239,8 +239,7 @@ async function execute(
             "Cette commande n'a pas encore été __setup__" +
                 (setl
                     ? ` pour le claim **${setl.s_name}**. `
-                    : `.\n-# *rappel: \`/commander claim:<nom_du_claim>\` pour faire commande pour un claim spécifique.*\n`) +
-                "Merci de d'abord faire `/setup_commandes`.",
+                    : `.\n-# *rappel: \`/item_request claim:<nom_du_claim>\` pour faire commande pour un claim spécifique.*\n`),
         );
         return;
     }
@@ -252,7 +251,7 @@ async function execute(
     if (!channel) {
         await interaction.reply({
             content:
-                "Le salon de commandes a été supprimé! Veuillez d'abord utiliser `/setup_commandes` ou contacter un admin.",
+                "Le salon de commandes a été supprimé! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             flags: MessageFlags.Ephemeral,
         });
         return;
@@ -427,7 +426,7 @@ async function execute(
     if (!panel) {
         interaction
             .editReply(
-                "Le salon panels n'a pas été défini! Faites d'abord `/setup_commandes` ou contactez un admin.",
+                "Le salon panels n'a pas été défini! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             )
             .catch(console.log);
         cmd.delete();

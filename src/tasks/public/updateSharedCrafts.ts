@@ -61,10 +61,24 @@ type Item = {
 
 type Request = {
     craftResults: Craft[];
-    items: Item[];
-    cargos: Item[];
+    items?: Item[];
+    cargos?: Item[];
     claims: { entityId: string; name: string }[];
 };
+
+type Member = {
+    // ...
+    entityId: string;
+    claimEntityId: string;
+    playerEntityId: string;
+    userName: string;
+    // ...
+}
+
+type Members = {
+    members: Member[];
+    count: number;
+}
 
 const colors = new Map<number, HexColorString>([
     [1, `#${"636a74"}`],
@@ -84,6 +98,7 @@ function getCraftEmbed(
     tier: number,
     skills: LevelRequirements[],
     claimName: string = "not found",
+    authorIconURL?: string,
 ) {
     const progress: number = craft.progress / craft.total;
     const profs = skills.map((sk) =>
@@ -112,6 +127,7 @@ function getCraftEmbed(
         )
         .setAuthor({
             name: shortenText(craft.owner_name ?? "author not found", 256),
+            iconURL: authorIconURL,
         })
         .setFields([
             {
@@ -128,6 +144,8 @@ function getCraftEmbed(
 }
 
 async function update(_data: TaskData, config: Config) {
+    const allMembers: Map<string, string[]> = new Map();
+
     const statuses = SharedCraftsStatus.fetchArray();
     const chanManager: ChannelManager = config.bot.channels;
 
@@ -147,6 +165,21 @@ async function update(_data: TaskData, config: Config) {
         );
         const req: Request = await res.json();
 
+        // Add members list to check map
+        if (!allMembers.has(status.claim_id)) {
+            const claimRes = await fetch(
+                `https://bitjita.com/api/claims/${status.claim_id}/members`,
+                {
+                    method: "GET",
+                    headers: {
+                        "User-Agent": "Notary - lebenet on discord",
+                    },
+                }
+            );
+            const claimReq: Members = await claimRes.json();
+            allMembers.set(status.claim_id, claimReq.members.map((m) => m.playerEntityId));
+        }
+
         const existing: Map<string, SharedCraft> = new Map();
         SharedCraft.fetchArray({
             keys: "status_id",
@@ -154,8 +187,8 @@ async function update(_data: TaskData, config: Config) {
         }).forEach((sc) => existing.set(sc.entityId, sc));
 
         const items = new Map<number, Item>();
-        req.cargos.forEach((c) => items.set(c.id, c));
-        req.items.forEach((i) => items.set(i.id, i));
+        req.cargos?.forEach((c) => items.set(c.id, c));
+        req.items?.forEach((i) => items.set(i.id, i));
 
         let c: number = 0;
         const promises = req.craftResults.map(async (craft) => {
@@ -209,6 +242,7 @@ async function update(_data: TaskData, config: Config) {
                         item?.tier ?? 1,
                         craft.levelRequirements,
                         craft.claimName,
+                        allMembers.get(status.claim_id)?.includes(craft.ownerEntityId) ? config.bot.user?.displayAvatarURL() : undefined
                     ).setThumbnail(
                         item
                             ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName

@@ -116,8 +116,7 @@ async function order(
                 "Cette commande n'a pas encore été __setup__" +
                 (setl
                     ? ` pour le claim **${setl.s_name}**. `
-                    : `.\n-# *rappel: \`/commander claim:<nom_du_claim>\` pour faire commande pour un claim spécifique.*\n`) +
-                "Merci de d'abord faire `/setup_commandes`.",
+                    : `.\n-# *rappel: \`/commander claim:<nom_du_claim>\` pour faire commande pour un claim spécifique.*\n`),
             flags: MessageFlags.Ephemeral,
         });
         return;
@@ -198,7 +197,7 @@ async function initHandler(
     if (!channel) {
         await interaction.reply({
             content:
-                "Le salon de commandes a été supprimé! Veuillez d'abord utiliser `/setup_commandes` ou contacter un admin.",
+                "Le salon de commandes a été supprimé! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             flags: MessageFlags.Ephemeral,
         });
         return;
@@ -233,6 +232,7 @@ async function initHandler(
     if (chest) command.chest = chest;
     if (description) command.description = description;
     if (setlId !== -1) command.settlement_id = setlId;
+    else command.settlement_id = null;
     command.self_supplied = self_supplied;
     command.author_id = interaction.user.id;
 
@@ -331,7 +331,7 @@ async function initHandler(
             components: [row1, row2, row3],
         });
 
-        msg.pin();
+        await msg.pin();
 
         command.message_id = msg.id;
         if (!command.update()) {
@@ -346,7 +346,7 @@ async function initHandler(
         await interaction.editReply(
             `Votre commande peut être __complétée__ dans **<#${thread.id}>** !`,
         );
-        setTimeout(() => interaction.deleteReply(), 15_000);
+        setTimeout(() => interaction.deleteReply().catch(), 15_000);
     }
 }
 
@@ -568,7 +568,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     if (!panel) {
         interaction
             .editReply(
-                "Le salon panels n'a pas été défini! Faites d'abord `/setup_commandes` ou contactez un admin.",
+                "Le salon panels n'a pas été défini! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             )
             .catch(console.log);
         command.delete();
@@ -608,7 +608,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         interaction
             .editReply("Erreur de database! L'interaction a échouée.")
             .catch(console.log);
-        panelMsg.delete();
+        await panelMsg.delete();
         return;
     }
 
@@ -648,7 +648,7 @@ async function assignHandler(
     );
     if (!chan) {
         await interaction.editReply(
-            "Le salon de commandes n'a pas été setup ! Merci de faire `/setup_commandes` ou de contacter un admin.",
+            "Le salon de commandes n'a pas été setup ! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
         );
         return;
     }
@@ -762,7 +762,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         );
         if (!panel) {
             await interaction.editReply(
-                "Il faut setup le bot! Faut faire `/setup_commandes` ou contacter un admin.",
+                "Il faut setup le bot! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             );
             return;
         }
@@ -790,7 +790,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         );
         if (!chan) {
             await interaction.editReply(
-                "Il faut setup le bot! Faut faire `/setup_commandes` ou contacter un admin.",
+                "Il faut setup le bot! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             );
             return;
         }
@@ -804,7 +804,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             | TextThreadChannel;
         if (!thread) {
             await interaction.editReply(
-                "Il faut setup le bot! Faut faire `/setup_commandes` ou contacter un admin.",
+                "Il faut setup le bot! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
             );
             return;
         }
@@ -1120,9 +1120,9 @@ async function addItemsHandler(
 
         item.message_id = msg.id;
         if (!item.update()) {
-            msg.delete();
+            await msg.delete();
             item.delete();
-        } else msg.pin();
+        } else await msg.pin();
     });
 
     // Update panel message
