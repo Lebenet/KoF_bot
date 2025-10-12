@@ -86,6 +86,11 @@ async function setupCrafts(
         return;
     }
 
+    if (del) {
+        await interaction.editReply("Nothing to delete.");
+        return;
+    }
+
     setup = new SharedCraftsStatus();
     setup.guild_id = interaction.guildId!;
     setup.channel_id = chan.id;
