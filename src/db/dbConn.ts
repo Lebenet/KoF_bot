@@ -105,7 +105,7 @@ const tables = [
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		message_id TEXT NOT NULL,
 		entityId TEXT NOT NULL,
-		status_id INTEGER NOT NULL REFERENCES SharedCraftsStatuss(id),
+		status_id INTEGER NOT NULL REFERENCES SharedCraftsStatuss(id) ON DELETE CASCADE,
 		item_name TEXT NOT NULL,
 		crafting_station TEXT NOT NULL,
 		status TEXT NOT NULL DEFAULT 'In Progress',
