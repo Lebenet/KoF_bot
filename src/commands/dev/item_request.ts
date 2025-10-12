@@ -59,7 +59,7 @@ fetch("https://api.bitcraftonline.ru/items")
         items.push(...data.data);
     })
     .catch((err) => {
-        throw err;
+        console.error(err);
     });
 
 function getPanelEmbed(command: Command): EmbedBuilder {
