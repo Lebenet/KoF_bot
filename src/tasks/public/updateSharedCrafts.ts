@@ -73,12 +73,12 @@ type Member = {
     playerEntityId: string;
     userName: string;
     // ...
-}
+};
 
 type Members = {
     members: Member[];
     count: number;
-}
+};
 
 const colors = new Map<number, HexColorString>([
     [1, `#${"636a74"}`],
@@ -174,10 +174,13 @@ async function update(_data: TaskData, config: Config) {
                     headers: {
                         "User-Agent": "Notary - lebenet on discord",
                     },
-                }
+                },
             );
             const claimReq: Members = await claimRes.json();
-            allMembers.set(status.claim_id, claimReq.members.map((m) => m.playerEntityId));
+            allMembers.set(
+                status.claim_id,
+                claimReq.members.map((m) => m.playerEntityId),
+            );
         }
 
         const existing: Map<string, SharedCraft> = new Map();
@@ -242,7 +245,11 @@ async function update(_data: TaskData, config: Config) {
                         item?.tier ?? 1,
                         craft.levelRequirements,
                         craft.claimName,
-                        allMembers.get(status.claim_id)?.includes(craft.ownerEntityId) ? config.bot.user?.displayAvatarURL() : undefined
+                        allMembers
+                            .get(status.claim_id)
+                            ?.includes(craft.ownerEntityId)
+                            ? config.bot.user?.displayAvatarURL()
+                            : undefined,
                     ).setThumbnail(
                         item
                             ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName
@@ -265,7 +272,7 @@ async function update(_data: TaskData, config: Config) {
             if (message) {
                 if (dbcraft._inserted && !dbcraft.update()) return;
                 else if (!dbcraft._inserted && !dbcraft.insert()) return;
-                message.edit(msg).catch();
+                message.edit(msg).catch(console.error);
                 c++;
                 return;
             }
@@ -274,7 +281,7 @@ async function update(_data: TaskData, config: Config) {
                 message = await channel.send(msg);
             } catch (err) {
                 console.log(msg.embeds[0]);
-                throw err;
+                return;
             }
             dbcraft.message_id = message.id;
 
@@ -282,7 +289,7 @@ async function update(_data: TaskData, config: Config) {
                 (dbcraft._inserted && !dbcraft.update()) ||
                 (!dbcraft._inserted && !dbcraft.insert())
             ) {
-                message.delete().catch();
+                message.delete().catch(console.error);
                 return;
             }
             c++;
@@ -300,7 +307,7 @@ async function update(_data: TaskData, config: Config) {
             }),
         ];
 
-        channel.bulkDelete(ids).catch();
+        await channel.bulkDelete(ids);
     }
 }
 
