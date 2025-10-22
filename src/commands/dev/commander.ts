@@ -466,41 +466,39 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
     );
     if (!panel) throw new Error("Something went wrong.");
 
-    const panelMessage = await (
-        (await config.bot.channels.fetch(panel.channel_id)) as TextChannel
-    ).messages.fetch(command.panel_message_id ?? "-1");
-    if (panelMessage) {
-        const embeds = [
-            EmbedBuilder.from(panelMessage.embeds[0])
-                .setColor(Colors.Red)
-                .setTitle(
-                    panelMessage.embeds[0].title?.replace(
-                        "Nouvelle commande !",
-                        "❌ **FERME**",
-                    ) ?? "❌ **FERME**",
-                ),
-        ];
-        await panelMessage.edit({
-            content: "Commande terminée.",
-            embeds: embeds,
-            components: [],
-        });
-    }
+    // Try to delete panel message
+    // (code is messy, but i just put a try-catch to fix bigs cos i'm lazy)
+    try {
+        const panelMessage = await (
+            (await config.bot.channels.fetch(panel.channel_id)) as TextChannel
+        ).messages.fetch(command.panel_message_id ?? "-1");
+        if (panelMessage) {
+            const embeds = [
+                EmbedBuilder.from(panelMessage.embeds[0])
+                    .setColor(Colors.Red)
+                    .setTitle(
+                        panelMessage.embeds[0].title?.replace(
+                            "Nouvelle commande !",
+                            "❌ **FERME**",
+                        ) ?? "❌ **FERME**",
+                    ),
+            ];
+            await panelMessage.edit({
+                content: "Commande terminée.",
+                embeds: embeds,
+                components: [],
+            });
+        }
+    } catch {}
 
     const thread = interaction.channel as ThreadChannel;
     await thread.delete();
 
     const msg = await interaction.user.send("Commande supprimée avec succès");
-    setTimeout(() => {
-        try {
-            msg.delete();
-        } catch (err) {
-            console.error(
-                `[ERROR] Couldn't delete message send to ${interaction.user.username}:\n`,
-                err,
-            );
-        }
-    }, 5_000);
+    setTimeout(
+        () => msg.delete().catch(err => console.error(`[ERROR] Couldn't delete message send to ${interaction.user.username}:\n`,err))
+        , 5_000
+    );
 }
 
 async function readyHandler(interaction: ButtonInteraction, config: Config) {
