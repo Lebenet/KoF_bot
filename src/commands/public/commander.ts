@@ -31,6 +31,8 @@ import {
     MessageType,
     TextThreadChannel,
     ForumThreadChannel,
+    Snowflake,
+    GuildForumTag,
 } from "discord.js";
 
 import { Config } from "../../utils/configLoader";
@@ -615,6 +617,45 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         embeds: [msgEmbed],
         components: [msgRow, msgRow2],
     });
+
+    // Only add tags after message edit was succesful
+    const post: ForumThreadChannel = msg.channel as ForumThreadChannel;
+    const forumId: string | null = post.parentId;
+    if (!forumId)
+    {
+        await interaction.editReply("Failed to apply tags for this post.\n" +
+            "Please apply them manually."
+        );
+        return;
+    }
+
+    const forum = await config.bot.channels.fetch(forumId) as ForumChannel |null;
+    if (!forum)
+    {
+        await interaction.editReply("Failed to apply tags for this post.\n" +
+            "Please apply them manually."
+        );
+        return;
+    }
+
+    const tags = forum.availableTags;
+    let toApply: Snowflake[] = [];
+
+    // get command's assigned professions
+    const profs: CommandProfession[] = CommandProfession.fetchArray({ keys: "command_id", values: command.id });
+
+    // find tags to apply
+    for (const prof of profs) {
+        for (const tag of tags) {
+            if (tag.name === prof.profession_name) {
+                toApply.push(tag.id);
+                break;
+            }
+        }
+    }
+
+    // apply them
+    await post.setAppliedTags(toApply);
 
     await interaction.deleteReply();
 }
