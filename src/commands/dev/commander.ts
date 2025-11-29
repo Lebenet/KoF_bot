@@ -31,6 +31,7 @@ import {
     MessageType,
     TextThreadChannel,
     ForumThreadChannel,
+    Attachment,
     Snowflake,
     GuildForumTag,
 } from "discord.js";
@@ -56,6 +57,13 @@ import {
     shortenText,
     shortenTitle,
 } from "../../utils/discordUtils";
+
+function generateShortId(): string {
+    return Math.random().toString(36).substring(2, 6);
+}
+
+// Global map storing CSV file URIs temporarily
+const tempCsvFiles: Map<string, { url: string; name: string }> = new Map();
 
 async function order(
     interaction: ChatInputCommandInteraction,
@@ -124,8 +132,39 @@ async function order(
         return;
     }
 
+    // Get optional file attachment
+    const attachment: Attachment | null =
+        interaction.options.getAttachment("fichier_csv");
+    let attachmentId = "";
+    if (attachment) {
+        // Check that it is a CSV file
+        if (!attachment.name?.toLowerCase().endsWith(".csv")) {
+            await interaction.reply({
+                content: "Le fichier doit être un .CSV !",
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
+        }
+
+        // Generate unique short id
+        let id: string = generateShortId();
+        while (tempCsvFiles.has(id)) {
+            id = generateShortId();
+        }
+
+        // Add it to the map
+        tempCsvFiles.set(id, { url: attachment.url, name: attachment.name });
+        console.log("[INFO] Stored temporary CSV file with id:", id);
+        console.log("[INFO] URL:", attachment.url);
+        console.log("[INFO] Name:", attachment.name);
+        attachmentId = id;
+    }
+
+    // Create the modal sent to the user
     const initModal = new ModalBuilder()
-        .setCustomId(`${guildId}|commander|initHandler|${setl?.id ?? -1}`)
+        .setCustomId(
+            `${guildId}|commander|initHandler|${setl?.id ?? -1}${attachment ? `|${attachmentId}` : ""}`,
+        )
         .setTitle("Détails de la commande")
         .addComponents(
             new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
@@ -175,8 +214,18 @@ async function initHandler(
     // What follows depends also on userId
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const guildId = interaction.customId.split("|")[0];
-    const setlId = Number(interaction.customId.split("|")[3]);
+    const customIdParts: string[] = interaction.customId.split("|");
+    const guildId = customIdParts[0];
+    const setlId = Number(customIdParts[3]);
+
+    // retrieve optional attachment
+    const attachmentId = customIdParts.length > 4 ? customIdParts[4] : null;
+    let attachment: { url: string; name: string } | null = null;
+    if (attachmentId && tempCsvFiles.has(attachmentId)) {
+        attachment = tempCsvFiles.get(attachmentId)!;
+        // Remove from map after retrieving
+        tempCsvFiles.delete(attachmentId);
+    }
 
     const chan = ChannelParam.getParam(
         guildId,
@@ -253,7 +302,7 @@ async function initHandler(
             .setCustomId(`|commander|readyHandler|${command.id}`)
             .setLabel("Confirmer")
             .setStyle(ButtonStyle.Success)
-            .setDisabled(true);
+            .setDisabled(attachment == null);
 
         // Cancel/Complete order button (remove from panel)
         const closeBut = new ButtonBuilder()
@@ -320,6 +369,82 @@ async function initHandler(
                         ? "- Par le créateur de la commande."
                         : "Non.",
                 },
+            );
+
+        let itemList: CommandItem[] = [];
+        let professionsSet: Set<string> = new Set();
+        // handle file attachment or not
+        if (attachment) {
+            // Parse CSV file and add items to the command
+            const response = await fetch(attachment.url);
+
+            // Check error case
+            if (!response.ok) {
+                await thread.delete();
+                command.delete();
+                await interaction.editReply(
+                    `Votre commande **${c_name}** n'a pas pu être créée (fichier inaccessible). Veuillez réessayer.`,
+                );
+                return;
+            }
+
+            // retrieve text and parse it line by line
+            const lines = (await response.text()).split(/\r?\n/);
+
+            // 1 to skip header
+            for (let i = 1; i < lines.length; i++) {
+                const line: string = lines[i];
+
+                // get components
+                const regex = /"([^"]*)","([^"]*)","([^"]*)","([^"]*)"/;
+                const parts = line.match(regex);
+                if (!parts || parts.length < 5) {
+                    continue; // skip malformed lines
+                }
+
+                const itemName: string = `T${parts[3]} ${parts[1]}`;
+                const qty: number = Number(parts[2]);
+                const profession: string = parts[4];
+
+                // Insert them in list
+                const item = new CommandItem();
+                item.command_id = command.id;
+                item.item_name = itemName;
+                item.quantity = qty;
+                if (!item.insert()) {
+                    try {
+                        await thread.send(
+                            `Erreur lors de l'ajout de l'item **${itemName}** *(x${qty})*.`,
+                        );
+                    } catch {}
+                } else {
+                    itemList.push(item);
+                    professionsSet.add(profession);
+                }
+            }
+
+            // Add professions to embed
+            message.addFields({
+                name: "Professions:",
+                value: Array.from(professionsSet).join(", "),
+            });
+
+            // Add them to the command as CommandProfession
+            for (const profName of professionsSet) {
+                const prof = new CommandProfession();
+                prof.command_id = command.id;
+                prof.profession_name = profName;
+                prof.filled = false;
+                if (!prof.insert()) {
+                    try {
+                        await thread.send(
+                            `Erreur lors de l'ajout du métier **${profName}** aux tags du thread.`,
+                        );
+                    } catch {}
+                }
+            }
+        } else {
+            message.addFields(
                 // Empty line
                 { name: "\u200e", value: "\u200e" },
                 {
@@ -327,13 +452,19 @@ async function initHandler(
                     value: "**Merci de sélectionner les professions correspondant à votre commande, afin de simplifier le travail des coordinateurs.**",
                 },
             );
+        }
+
+        let components = [row1, row2];
+        if (attachment) {
+            components.push(row3);
+        }
 
         const msg = await thread.send({
             embeds: [message],
-            components: [row1, row2, row3],
+            components,
         });
 
-        await msg.pin();
+        await msg.pin().catch(() => {});
 
         command.message_id = msg.id;
         if (!command.update()) {
@@ -345,6 +476,97 @@ async function initHandler(
             return;
         }
 
+        let pinsList: string[] = [];
+        // Message collector to remove pins notification
+        const collector = thread.createMessageCollector({
+            time: 3600_000, // 1 hour (for big commands)
+            filter: (m) => m.type === MessageType.ChannelPinnedMessage,
+        });
+        collector.on("collect", (m) => {
+            pinsList.push(m.id);
+            // console.log("[INFO] Collected pin message:", m.id);
+            // console.log("[INFO] Total pin messages to delete:", pinsList.length);
+        });
+
+        // Send items list to thread asycnhronously
+        // Create tasks and await them all at once
+        const sendTasks: Promise<void>[] = [];
+        for (const item of itemList) {
+            sendTasks.push(
+                (async (item: CommandItem) => {
+                    // Create components
+                    const advanceBut = new ButtonBuilder()
+                        .setCustomId(
+                            `|commander|advanceItemSend|${command.id}|${item.id}`,
+                        )
+                        .setLabel("Avancer")
+                        .setEmoji("➕")
+                        .setStyle(ButtonStyle.Secondary);
+
+                    const completeBut = new ButtonBuilder()
+                        .setCustomId(
+                            `|commander|completeItemHandler|${command.id}|${item.id}`,
+                        )
+                        .setLabel("Compléter")
+                        .setEmoji("✅")
+                        .setStyle(ButtonStyle.Success);
+
+                    // Create message
+                    let msg: Message | null = null;
+                    try {
+                        msg = await thread.send({
+                            content: shortenMessage(
+                                `### 🔃 [0/${item.quantity}] - ${item.item_name}`,
+                            ),
+                            components: [
+                                new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                    [advanceBut, completeBut],
+                                ),
+                            ],
+                        });
+                    } catch {}
+
+                    if (msg == null) {
+                        item.delete();
+                        thread
+                            .send(
+                                `L'item **${item.item_name}** n'a pas pu être créé (message send failed). Veuillez réessayer.`,
+                            )
+                            .catch(() => {});
+                        return;
+                    }
+
+                    // Send and pin message
+                    item.message_id = msg.id;
+                    if (!item.update()) {
+                        // Ignore errors to not calcel while pipeline on fail
+                        msg.delete().catch(() => {});
+                        item.delete();
+                        thread
+                            .send(
+                                `L'item **${item.item_name}** n'a pas pu être créé (update failed). Veuillez réessayer.`,
+                            )
+                            .catch(() => {});
+                    } else await msg.pin();
+                })(item),
+            );
+        }
+
+        // console.log(`[INFO] Sending ${sendTasks.length} item messages to thread...`);
+        // await messages
+        await Promise.all(sendTasks).catch(console.error);
+        // console.log(`[INFO] All item messages sent to thread.`);
+
+        // Delete pin notifications
+        if (pinsList.length > 0) {
+            // console.log("[INFO] Deleting pin messages:", pinsList.join(", "));
+            thread.bulkDelete(pinsList).catch(console.error);
+            collector.stop();
+        }
+
+        console.log(
+            `[INFO] Command ${command.c_name} created successfully in thread ${thread.id}.`,
+        );
         await interaction.editReply(
             `Votre commande peut être __complétée__ dans **<#${thread.id}>** !`,
         );
@@ -498,8 +720,16 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
 
     const msg = await interaction.user.send("Commande supprimée avec succès");
     setTimeout(
-        () => msg.delete().catch(err => console.error(`[ERROR] Couldn't delete message send to ${interaction.user.username}:\n`,err))
-        , 5_000
+        () =>
+            msg
+                .delete()
+                .catch((err) =>
+                    console.error(
+                        `[ERROR] Couldn't delete message send to ${interaction.user.username}:\n`,
+                        err,
+                    ),
+                ),
+        5_000,
     );
 }
 
@@ -621,19 +851,21 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     // Only add tags after message edit was succesful
     const post: ForumThreadChannel = msg.channel as ForumThreadChannel;
     const forumId: string | null = post.parentId;
-    if (!forumId)
-    {
-        await interaction.editReply("Failed to apply tags for this post.\n" +
-            "Please apply them manually."
+    if (!forumId) {
+        await interaction.editReply(
+            "Failed to apply tags for this post.\n" +
+                "Please apply them manually.",
         );
         return;
     }
 
-    const forum = await config.bot.channels.fetch(forumId) as ForumChannel |null;
-    if (!forum)
-    {
-        await interaction.editReply("Failed to apply tags for this post.\n" +
-            "Please apply them manually."
+    const forum = (await config.bot.channels.fetch(
+        forumId,
+    )) as ForumChannel | null;
+    if (!forum) {
+        await interaction.editReply(
+            "Failed to apply tags for this post.\n" +
+                "Please apply them manually.",
         );
         return;
     }
@@ -642,7 +874,10 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     let toApply: Snowflake[] = [];
 
     // get command's assigned professions
-    const profs: CommandProfession[] = CommandProfession.fetchArray({ keys: "command_id", values: command.id });
+    const profs: CommandProfession[] = CommandProfession.fetchArray({
+        keys: "command_id",
+        values: command.id,
+    });
 
     // find tags to apply
     for (const prof of profs) {
@@ -654,8 +889,8 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         }
     }
 
-    // apply them
-    await post.setAppliedTags(toApply);
+    // apply them (only the first 5, discord limitation)
+    await post.setAppliedTags(toApply.slice(0, 5));
 
     await interaction.deleteReply();
 }
@@ -1430,6 +1665,14 @@ module.exports = {
                     )
                     .setRequired(false)
                     .addChoices(getSettlementsHelper(__dirname, true)),
+            )
+            .addAttachmentOption((option) =>
+                option
+                    .setName("fichier_csv")
+                    .setDescription(
+                        "Fichier CSV à partir duquel construire la commande",
+                    )
+                    .setRequired(false),
             ),
 
     execute: order,
