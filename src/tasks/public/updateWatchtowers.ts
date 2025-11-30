@@ -158,7 +158,7 @@ function getEmbeds(
 
                 const newSieged: DbWatchtower = new DbWatchtower();
                 newSieged.id = wt.entityId;
-                
+
                 let isNew = false;
                 if (!newSieged.sync()) {
                     newSieged.sieged = true;
@@ -177,19 +177,21 @@ function getEmbeds(
                         .then((alert) =>
                             alert
                                 .send(
-                                    "## =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n" +
-                                        `# NEW SIEGE ALERT (*${wt.nickname} __vs__ ${attacker.empireName}*)\n` +
+                                    "# __                                                          __\n" +
+                                        `## NEW SIEGE ALERT\n` +
+                                        `Defense: *${wt.nickname}*\n` +
+                                        `Attack: *${attacker.empireName}*\n\n` +
                                         `__started at__: <t:${start}:f>\n` +
                                         "```" +
                                         `<t:${start}:f>` +
                                         "```\n" +
-                                        `__attack empty at__: <t:${nowSecs + attackerRemainingSeconds}:f> <t:${nowSecs + attackerRemainingSeconds}:R>\n` +
+                                        `__attack end__: <t:${nowSecs + attackerRemainingSeconds}:f>\n` +
                                         "```" +
-                                        `<t:${nowSecs + attackerRemainingSeconds}:f> <t:${nowSecs + attackerRemainingSeconds}:R>` +
+                                        `<t:${nowSecs + attackerRemainingSeconds}:f>` +
                                         "```\n" +
-                                        `__defense empty at__: <t:${nowSecs + defenderRemainingSeconds}:f> <t:${nowSecs + defenderRemainingSeconds}:R>\n` +
+                                        `__defense end__: <t:${nowSecs + defenderRemainingSeconds}:f>\n` +
                                         "```" +
-                                        `<t:${nowSecs + defenderRemainingSeconds}:f> <t:${nowSecs + defenderRemainingSeconds}:R>` +
+                                        `<t:${nowSecs + defenderRemainingSeconds}:f>` +
                                         "```",
                                 )
                                 .catch(),

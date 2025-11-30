@@ -455,7 +455,7 @@ async function initHandler(
         }
 
         let components = [row1, row2];
-        if (attachment) {
+        if (attachment == null) {
             components.push(row3);
         }
 
