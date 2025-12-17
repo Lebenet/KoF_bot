@@ -33,6 +33,8 @@ import { getConfig, setDb, setBot } from "./utils/configLoader";
 
 import { saveModalData, waitForUnlock, resendModal } from "./utils/modalSaver";
 
+import { GMUPred, getGuildMemberPreds } from "./utils/actionLoader";
+
 import { db } from "./db/dbConn";
 setDb(db);
 
@@ -321,6 +323,29 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 
         return;
     }
+
+    // Member update
+    if (interaction.is)
+});
+
+// Member update
+client.on(Events.GuildMemberUpdate, async (oldm: GuildMember, newm: GuildMember) => {
+    const cfg: Config = getConfig();
+
+    // TODO: Get predicates; if none: return
+    const preds: GMUPred[] | null = getMemberUpdatePreds(oldm.guildId);
+    if (!preds)
+        return;
+
+    // Go through the predicates and apply whichever is applicable
+    preds.forEach((pred: GMUPred) => {
+        // TODO: applies checks whether there exists a action to do here
+        if (pred.applies(oldm, newm) &&
+            // Ensure dev actions are only run in dev server
+                (!pred.isDev || process.env.DEV_GUILD_ID == oldm.guildId)
+            // TODO: runs the action
+            pred.runAction(oldm, newm);
+    });
 });
 
 // Temporary
@@ -340,8 +365,8 @@ client.on(
                 .then((u) =>
                     u?.user?.send(
                         "Essayez plutôt de faire `/commander claim:Lutece` la prochaine fois !\nCa permet de mieux garder le fil :p",
-                    ),
+                    ).catch(console.error),
                 )
-                .catch(console.log);
+                .catch(console.error);
     },
 );
