@@ -41,6 +41,7 @@ export const db = globalThis.__db as Database.Database;
 const tables = [
     // Temporary
 
+    `DROP TABLE IF EXISTS Commands;`,
     // `DROP TABLE ChannelParams;`,
     // `DROP TABLE Skills`,
     // `DROP TABLE Users`,
@@ -166,7 +167,9 @@ const tables = [
 		self_supplied BOOLEAN NOT NULL DEFAULT FALSE CHECK (self_supplied IN (0, 1)),
 		last_edited DATETIME NOT NULL DEFAULT (datetime('now', 'localtime')),
 		author_id TEXT NOT NULL REFERENCES Users(id),
-		status VARCHAR(255) NOT NULL DEFAULT "Building"
+	    status VARCHAR(255) NOT NULL DEFAULT "Profs",` /* Profs, Building, Ready */ +
+        `
+		ping BOOLEAN NOT NULL DEFAULT FALSE CHECK (ping IN (0, 1))
 	);`,
     `CREATE TABLE IF NOT EXISTS CommandAssignees(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,

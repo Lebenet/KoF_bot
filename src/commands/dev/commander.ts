@@ -65,6 +65,76 @@ function generateShortId(): string {
 // Global map storing CSV file URIs temporarily
 const tempCsvFiles: Map<string, { url: string; name: string }> = new Map();
 
+function getCommandButtons(
+    command: Command,
+): ActionRowBuilder<MessageActionRowComponentBuilder>[] {
+    // Ready button, disabled if status is "Profs"
+    const readyBut = new ButtonBuilder()
+        .setCustomId(`|commander|readyHandler|${command.id}`)
+        .setLabel("Confirmer")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(command.status === "Profs");
+
+    // Claim button
+    const claimBut = new ButtonBuilder()
+        .setCustomId(`${command.guildId}|commander|claimHandler|${command.id}`)
+        .setLabel("Auto-assigner")
+        .setEmoji({ name: "✋" })
+        .setStyle(ButtonStyle.Secondary);
+
+    // Cancel/Complete order button (remove from panel)
+    const closeBut = new ButtonBuilder()
+        .setCustomId(`|commander|closeHandler|${command.id}`)
+        .setLabel("Fermer")
+        .setStyle(ButtonStyle.Danger);
+
+    // To add items
+    const addItemsBut = new ButtonBuilder()
+        .setCustomId(`|commander|addItemsSend|${command.id}`)
+        .setLabel("Ajouter Items")
+        .setStyle(ButtonStyle.Secondary);
+
+    // To ping professions
+    const pingBut = new ButtonBuilder()
+        .setCustomId(`|commander|pingProfsHandler|${command.id}`)
+        .setLabel(command.ping ? "Désactiver ping" : "Activer ping")
+        .setStyle(ButtonStyle.Secondary);
+
+    const row1: ActionRowBuilder<MessageActionRowComponentBuilder> =
+        new ActionRowBuilder<MessageActionRowComponentBuilder>();
+    if (command.status !== "Ready") {
+        row1.addComponents(readyBut, closeBut);
+    } else {
+        row1.addComponents(claimBut, closeBut);
+    }
+
+    const row2 =
+        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+            addItemsBut,
+        );
+    if (command.status !== "Ready") {
+        row2.addComponents(pingBut);
+    }
+
+    // Only add 'Profs' row if status is "Profs"
+    if (command.status !== "Profs") return [row1, row2];
+
+    // Profession select menu
+    const opts = getProfessionsStringSelectMessageComp();
+    const profs = new StringSelectMenuBuilder()
+        .setCustomId(`|commander|manageProfessionsHandler|${command.id}`)
+        .setPlaceholder("Métiers")
+        .addOptions(opts)
+        .setMaxValues(opts.length);
+
+    const row3 =
+        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+            profs,
+        );
+
+    return [row1, row2, row3];
+}
+
 async function order(
     interaction: ChatInputCommandInteraction,
     _config: Config,
@@ -286,6 +356,7 @@ async function initHandler(
     else command.settlement_id = null;
     command.self_supplied = self_supplied;
     command.author_id = interaction.user.id;
+    command.status = attachment === null ? "Profs" : "Building";
 
     if (!command.insert()?.sync()) {
         await thread.delete();
@@ -297,52 +368,7 @@ async function initHandler(
         thread.members.add(interaction.user.id);
         await thread.join();
 
-        // Confirm order button (send to panel)
-        const readyBut = new ButtonBuilder()
-            .setCustomId(`|commander|readyHandler|${command.id}`)
-            .setLabel("Confirmer")
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(attachment == null);
-
-        // Cancel/Complete order button (remove from panel)
-        const closeBut = new ButtonBuilder()
-            .setCustomId(`|commander|closeHandler|${command.id}`)
-            .setLabel("Fermer")
-            .setStyle(ButtonStyle.Danger);
-
-        // To add items
-        const addItemsBut = new ButtonBuilder()
-            .setCustomId(`|commander|addItemsSend|${command.id}`)
-            .setLabel("Ajouter Items")
-            .setStyle(ButtonStyle.Secondary);
-
-        // Profession select menu
-        const opts = getProfessionsStringSelectMessageComp();
-        const profs = new StringSelectMenuBuilder()
-            .setCustomId(`|commander|manageProfessionsHandler|${command.id}`)
-            .setPlaceholder("Métiers")
-            .addOptions(opts)
-            .setMaxValues(opts.length);
-
-        // ActionRowBuilder
-        const row1 =
-            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                readyBut,
-                closeBut,
-            );
-
-        const row2 =
-            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                addItemsBut,
-            );
-
-        const row3 =
-            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                profs,
-            );
-
         // Order embed
-
         const desc = shortenText(command.description, 1000);
 
         const message = new EmbedBuilder()
@@ -454,10 +480,8 @@ async function initHandler(
             );
         }
 
-        let components = [row1, row2];
-        if (attachment == null) {
-            components.push(row3);
-        }
+        // Buttons
+        const components = getCommandButtons(command);
 
         const msg = await thread.send({
             embeds: [message],
@@ -572,6 +596,39 @@ async function initHandler(
         );
         setTimeout(() => interaction.deleteReply().catch(), 15_000);
     }
+}
+
+async function pingProfsHandler(
+    interaction: ButtonInteraction,
+    config: Config,
+) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    if (!command.sync()) {
+        await interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    // update command server-side
+    command.ping = !command.ping;
+    if (!command.update()) {
+        await interaction.editReply("L'interaction a échouée.");
+        return;
+    }
+
+    // Update button label client-side
+    const msg = interaction.message;
+    const components = getCommandButtons(command);
+    await msg.edit({
+        components,
+    });
+
+    // Delete reply if everything went well
+    await interaction.deleteReply();
 }
 
 async function manageProfessionsHandler(
@@ -771,18 +828,6 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
         .setEmoji({ name: "✋" })
         .setStyle(ButtonStyle.Secondary);
 
-    const delBut = ButtonBuilder.from(
-        (msg.components[0] as ActionRow<MessageActionRowComponent>)
-            .components[1] as ButtonComponent,
-    );
-
-    const msgRow =
-        new ActionRowBuilder<MessageActionRowComponentBuilder>().setComponents(
-            claimBut,
-            delBut,
-        );
-    const msgRow2 = msg.components[1];
-
     // Get panel to send message to
     const ppanel = ChannelParam.getParam(
         interaction.guildId ?? "0",
@@ -845,8 +890,27 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     // Only edit after ready has been updated on database
     await msg.edit({
         embeds: [msgEmbed],
-        components: [msgRow, msgRow2],
+        components: getCommandButtons(command),
     });
+
+    // Ping professions tags
+    const profsPing: CommandProfession[] = CommandProfession.fetchArray({
+        keys: "command_id",
+        values: command.id,
+    });
+    let pingMsg = "";
+    if (command.ping && profsPing.length > 0) {
+        const thread = (await config.bot.channels.fetch(
+            command.thread_id,
+        )) as ThreadChannel;
+        const mentionStr = profsPing
+            .map((p) => `@${p.profession_name}`)
+            .join(" ");
+        pingMsg =
+            `Nouvelle commande pour les métiers: ${mentionStr}\n` +
+            `Dans le thread: <#${thread.id}>`;
+        await thread.send(pingMsg);
+    }
 
     // Only add tags after message edit was succesful
     const post: ForumThreadChannel = msg.channel as ForumThreadChannel;
@@ -1677,6 +1741,7 @@ module.exports = {
 
     execute: order,
     initHandler: initHandler,
+    pingProfsHandler: pingProfsHandler,
 
     assignHandler: assignHandler,
     claimHandler: claimHandler,

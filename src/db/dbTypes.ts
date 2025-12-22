@@ -666,10 +666,12 @@ export class Command extends Model {
     public last_edited!: Date;
     public author_id!: string;
     public status!: string;
+    public ping!: boolean;
 
     override fieldTypes: Record<string, FieldType> = {
         last_edited: "Date",
         self_supplied: "boolean",
+        ping: "boolean",
     };
 }
 
