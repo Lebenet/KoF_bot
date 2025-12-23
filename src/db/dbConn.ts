@@ -41,7 +41,7 @@ export const db = globalThis.__db as Database.Database;
 const tables = [
     // Temporary
 
-    `DROP TABLE IF EXISTS Commands;`,
+    // `DROP TABLE IF EXISTS Commands;`,
     // `DROP TABLE ChannelParams;`,
     // `DROP TABLE Skills`,
     // `DROP TABLE Users`,
@@ -136,6 +136,13 @@ const tables = [
 		description TEXT NOT NULL,
 		emoji TEXT NOT NULL DEFAULT "⁉️",
 		skill_id INTEGER NOT NULL DEFAULT 0
+	);`,
+	`CREATE TABLE IF NOT EXISTS ProfessionLinks(
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name),
+		role_id TEXT NOT NULL,
+		guild_id TEXT NOT NULL,
+		UNIQUE (role_id, guild_id)
 	);`,
     `CREATE TABLE IF NOT EXISTS Fournisseurs (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

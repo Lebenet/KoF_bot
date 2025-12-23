@@ -609,6 +609,13 @@ export class Profession extends Model {
     }
 }
 
+export class ProfessionLink extends Model {
+    public id!: number;
+    public profession_name!: string;
+    public role_id!: string;
+    public guild_id!: string;
+}
+
 export class Fournisseur extends Model {
     public user_id!: string;
     public guild_id!: string;

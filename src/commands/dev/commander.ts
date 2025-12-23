@@ -47,6 +47,7 @@ import {
     User,
     Fournisseur,
     Settlement,
+    ProfessionLink,
 } from "../../db/dbTypes";
 
 import {
@@ -637,6 +638,7 @@ async function manageProfessionsHandler(
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    // Get database command
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
     if (!command.sync()) {
@@ -646,6 +648,7 @@ async function manageProfessionsHandler(
         return;
     }
 
+    // Ownership check
     if (
         interaction.user.id !== command.author_id &&
         !config.admins?.includes(interaction.user.id)
@@ -654,6 +657,11 @@ async function manageProfessionsHandler(
         return;
     }
 
+    // Update command status
+    command.status = "Building";
+    command.update();
+
+    // Get selected professions
     const selected: string[] = interaction.values;
     const profs: CommandProfession[] = [];
 
@@ -681,32 +689,10 @@ async function manageProfessionsHandler(
                   },
         ),
     );
-    // Filter out the component with the matching customId
-    const components = msg.components.filter(
-        (row) =>
-            row.type !== ComponentType.ActionRow ||
-            (row.components.length > 0 &&
-                !row.components.some(
-                    (c) => c.customId === interaction.customId,
-                )),
-    );
-    const updatedComponents = components.map((row) => {
-        if (row.type !== ComponentType.ActionRow) return row;
-
-        const newRow = new ActionRowBuilder<MessageActionRowComponentBuilder>();
-        for (const component of row.components) {
-            // If it's the button we want to enable
-            if (component.type === ComponentType.Button)
-                newRow.addComponents(
-                    ButtonBuilder.from(component).setDisabled(false),
-                );
-        }
-        return newRow;
-    });
 
     await msg.edit({
         embeds: [embed],
-        components: updatedComponents,
+        components: getCommandButtons(command),
     });
 
     await interaction.deleteReply();
@@ -894,21 +880,27 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     });
 
     // Ping professions tags
-    const profsPing: CommandProfession[] = CommandProfession.fetchArray({
+    // get professions to ping
+    const profsPing: string[] = CommandProfession.fetchArray({
         keys: "command_id",
         values: command.id,
-    });
+    }).map((prof: CommandProfession) => prof.profession_name);
+    // get their associated roles
+    const profsRoles: ProfessionLink[] = ProfessionLink.fetchArray({
+        keys: "guild_id",
+        values: command.guild_id,
+    }).filter((link: ProfessionLink) => profsPing.includes(link.profession_name));
+    // Build ping message
     let pingMsg = "";
     if (command.ping && profsPing.length > 0) {
         const thread = (await config.bot.channels.fetch(
             command.thread_id,
         )) as ThreadChannel;
-        const mentionStr = profsPing
-            .map((p) => `@${p.profession_name}`)
+        const mentionStr = profsRoles
+            .map((l) => `<@&${l.role_id}>`)
             .join(" ");
         pingMsg =
-            `Nouvelle commande pour les métiers: ${mentionStr}\n` +
-            `Dans le thread: <#${thread.id}>`;
+            `Nouvelle commande pour les métiers: ${mentionStr}`
         await thread.send(pingMsg);
     }
 
