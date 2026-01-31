@@ -34,6 +34,7 @@ import {
     Attachment,
     Snowflake,
     GuildForumTag,
+    BaseMessageOptions,
 } from "discord.js";
 
 import { Config } from "../../utils/configLoader";
@@ -48,6 +49,7 @@ import {
     Fournisseur,
     Settlement,
     ProfessionLink,
+    CommandItemsProgression,
 } from "../../db/dbTypes";
 
 import {
@@ -443,7 +445,7 @@ async function initHandler(
                         await thread.send(
                             `Erreur lors de l'ajout de l'item **${itemName}** *(x${qty})*.`,
                         );
-                    } catch {}
+                    } catch { }
                 } else {
                     itemList.push(item);
                     professionsSet.add(profession);
@@ -467,7 +469,7 @@ async function initHandler(
                         await thread.send(
                             `Erreur lors de l'ajout du métier **${profName}** aux tags du thread.`,
                         );
-                    } catch {}
+                    } catch { }
                 }
             }
         } else {
@@ -489,7 +491,7 @@ async function initHandler(
             components,
         });
 
-        await msg.pin().catch(() => {});
+        await msg.pin().catch(() => { });
 
         command.message_id = msg.id;
         if (!command.update()) {
@@ -549,7 +551,7 @@ async function initHandler(
                                 ),
                             ],
                         });
-                    } catch {}
+                    } catch { }
 
                     if (msg == null) {
                         item.delete();
@@ -557,7 +559,7 @@ async function initHandler(
                             .send(
                                 `L'item **${item.item_name}** n'a pas pu être créé (message send failed). Veuillez réessayer.`,
                             )
-                            .catch(() => {});
+                            .catch(() => { });
                         return;
                     }
 
@@ -565,13 +567,13 @@ async function initHandler(
                     item.message_id = msg.id;
                     if (!item.update()) {
                         // Ignore errors to not calcel while pipeline on fail
-                        msg.delete().catch(() => {});
+                        msg.delete().catch(() => { });
                         item.delete();
                         thread
                             .send(
                                 `L'item **${item.item_name}** n'a pas pu être créé (update failed). Veuillez réessayer.`,
                             )
-                            .catch(() => {});
+                            .catch(() => { });
                     } else await msg.pin();
                 })(item),
             );
@@ -684,9 +686,9 @@ async function manageProfessionsHandler(
             !f.name.toLowerCase().includes("informations")
                 ? f
                 : {
-                      name: "Professions:",
-                      value: profs.map((p) => p.profession_name).join(", "),
-                  },
+                    name: "Professions:",
+                    value: profs.map((p) => p.profession_name).join(", "),
+                },
         ),
     );
 
@@ -756,7 +758,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
                 components: [],
             });
         }
-    } catch {}
+    } catch { }
 
     const thread = interaction.channel as ThreadChannel;
     await thread.delete();
@@ -910,7 +912,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     if (!forumId) {
         await interaction.editReply(
             "Failed to apply tags for this post.\n" +
-                "Please apply them manually.",
+            "Please apply them manually.",
         );
         return;
     }
@@ -921,7 +923,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     if (!forum) {
         await interaction.editReply(
             "Failed to apply tags for this post.\n" +
-                "Please apply them manually.",
+            "Please apply them manually.",
         );
         return;
     }
@@ -1010,8 +1012,8 @@ async function assignHandler(
     const users = interaction.users;
     const thread = await (
         (await config.bot.channels.fetch(chan.channel_id)) as
-            | ForumChannel
-            | TextChannel
+        | ForumChannel
+        | TextChannel
     ).threads.fetch(command.thread_id);
     if (!thread) {
         interaction
@@ -1099,8 +1101,8 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 
         panelMsg = (await (
             (await config.bot.channels.fetch(panel.channel_id)) as
-                | TextChannel
-                | undefined
+            | TextChannel
+            | undefined
         )?.messages.fetch(command.panel_message_id!)) as Message | undefined;
 
         if (!panelMsg) {
@@ -1127,8 +1129,8 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 
         thread = (await (
             (await config.bot.channels.fetch(chan.channel_id)) as
-                | ForumChannel
-                | TextChannel
+            | ForumChannel
+            | TextChannel
         ).threads.fetch(command.thread_id)) as
             | ForumThreadChannel
             | TextThreadChannel;
@@ -1341,6 +1343,64 @@ async function updatePanel(command: Command, config: Config) {
         .catch(console.log);
 }
 
+function getItemComponents(item: CommandItem): BaseMessageOptions {
+    const progressions = CommandItemsProgression.fetchArray({
+        keys: "item_id",
+        values: item.id,
+    }) as CommandItemsProgression[];
+
+    const remaining = item.quantity - item.progress;
+
+    const totalReservedRemaining = progressions.reduce(
+        (acc, p) => acc + Math.max(0, p.reserved - p.progress),
+        0,
+    );
+    const reserveDisabled = totalReservedRemaining >= remaining;
+
+    // Buttons
+    const advanceBut = new ButtonBuilder()
+        .setCustomId(`|commander|advanceItemSend|${item.command_id}|${item.id}`)
+        .setLabel("Avancer")
+        .setEmoji("➕")
+        .setStyle(ButtonStyle.Secondary);
+
+    const completeBut = new ButtonBuilder()
+        .setCustomId(
+            `|commander|completeItemHandler|${item.command_id}|${item.id}`,
+        )
+        .setLabel("Compléter")
+        .setEmoji("✅")
+        .setStyle(ButtonStyle.Success);
+
+    const reserveBut = new ButtonBuilder()
+        .setCustomId(`|commander|reserveItemSend|${item.command_id}|${item.id}`)
+        .setLabel("Réserver")
+        .setEmoji("✋")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(reserveDisabled);
+
+    const row =
+        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+            advanceBut,
+            completeBut,
+            reserveBut,
+        );
+
+    let content = `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`;
+
+    if (progressions.length > 0) {
+        content += "\n\n**Réservations:**";
+        for (const p of progressions) {
+            content += `\n- <@${p.user_id}>: [${p.progress}/${p.reserved}]`;
+        }
+    }
+
+    return {
+        content: shortenMessage(content),
+        components: [row],
+    };
+}
+
 async function addItemsHandler(
     interaction: ModalSubmitInteraction,
     config: Config,
@@ -1372,8 +1432,8 @@ async function addItemsHandler(
 
     const thread = await (
         (await config.bot.channels.fetch(channel.channel_id)) as
-            | TextChannel
-            | ForumChannel
+        | TextChannel
+        | ForumChannel
     ).threads.fetch(command.thread_id);
     if (!thread) return;
 
@@ -1394,7 +1454,7 @@ async function addItemsHandler(
     collector.on("collect", async (m) => {
         try {
             await m.delete();
-        } catch {}
+        } catch { }
     });
 
     interaction.fields.fields.forEach(async (f) => {
@@ -1422,31 +1482,7 @@ async function addItemsHandler(
 
         if (!item.insert()?.sync()) return;
 
-        // Create components
-        const advanceBut = new ButtonBuilder()
-            .setCustomId(`|commander|advanceItemSend|${command.id}|${item.id}`)
-            .setLabel("Avancer")
-            .setEmoji("➕")
-            .setStyle(ButtonStyle.Secondary);
-
-        const completeBut = new ButtonBuilder()
-            .setCustomId(
-                `|commander|completeItemHandler|${command.id}|${item.id}`,
-            )
-            .setLabel("Compléter")
-            .setEmoji("✅")
-            .setStyle(ButtonStyle.Success);
-
-        const msg = await thread.send({
-            content: shortenMessage(
-                `### 🔃 [0/${item.quantity}] - ${item.item_name}`,
-            ),
-            components: [
-                new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                    [advanceBut, completeBut],
-                ),
-            ],
-        });
+        const msg = await thread.send(getItemComponents(item));
 
         item.message_id = msg.id;
         if (!item.update()) {
@@ -1515,11 +1551,15 @@ async function updateItem(
 
     if (!message) message = await thread.messages.fetch(item.message_id!);
 
-    if (item.progress >= item.quantity) await message.delete();
-    else
-        await message.edit(
-            `### 🔃 [${item.progress}/${item.quantity}] - ${item.item_name}`,
-        );
+    // remove all reservations if item is completed
+    if (item.progress >= item.quantity) {
+        await message.delete();
+        const progs: CommandItemsProgression[] = CommandItemsProgression.fetchArray({
+            keys: "item_id",
+            values: item.id,
+        });
+        progs.forEach((p) => p.delete());
+    } else await message.edit(getItemComponents(item));
 
     const srcMsg = await thread.messages.fetch(command.message_id!);
     const items = shortenText(
@@ -1646,7 +1686,11 @@ async function advanceItemHandler(
         return;
     }
 
+    // handle progression
+    const oldProgress = item.progress;
     item.progress = Math.min(item.quantity, item.progress + quantity);
+    const added = item.progress - oldProgress;
+
     if (!item.update()) {
         await interaction.editReply(
             "Erreur de Database, pas réussi à enregistrer l'interaction.",
@@ -1654,12 +1698,196 @@ async function advanceItemHandler(
         return;
     }
 
+    // update reservation if exists
+    const progression = CommandItemsProgression.get({
+        keys: ["item_id", "user_id"],
+        values: [item.id, interaction.user.id],
+    }) as CommandItemsProgression | null;
+
+    if (progression) {
+        progression.progress += added;
+        if (progression.progress >= progression.reserved) {
+            progression.delete();
+        } else {
+            progression.update();
+        }
+    }
+
     if (item.message_id) await updateItem(command, item, config);
     if (command.panel_message_id) updatePanel(command, config);
     interaction.deleteReply();
 }
 
+async function reserveItemSend(interaction: ButtonInteraction, config: Config) {
+    const commandId = interaction.customId.split("|")[3];
+    const itemId = interaction.customId.split("|")[4];
+
+    const command = new Command();
+    command.id = commandId;
+
+    const item = new CommandItem();
+    item.id = itemId;
+
+    if (!command.sync() || !item.sync()) {
+        interaction
+            .reply({
+                content:
+                    "Erreur de Database, pas réussi à enregistrer l'interaction.",
+                flags: MessageFlags.Ephemeral,
+            })
+            .catch(console.log);
+        return;
+    }
+
+    if (command.status.toLowerCase() !== "ready") {
+        interaction
+            .reply({
+                content: "Cette commande n'est pas encore confirmée !",
+                flags: MessageFlags.Ephemeral,
+            })
+            .catch(console.log);
+        return;
+    }
+
+    const modal = new ModalBuilder()
+        .setCustomId(
+            `${interaction.guildId}|commander|reserveItemHandler|${command.id}|${item.id}`,
+        )
+        .setTitle("Combien ?")
+        .addComponents([
+            new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
+                [
+                    new TextInputBuilder()
+                        .setCustomId(`quantity`)
+                        .setStyle(TextInputStyle.Short)
+                        .setLabel("Quantité :")
+                        .setRequired(true),
+                ],
+            ),
+        ]);
+
+    interaction.showModal(modal);
+}
+
+async function reserveItemHandler(
+    interaction: ModalSubmitInteraction,
+    config: Config,
+) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    const item = new CommandItem();
+    item.id = interaction.customId.split("|")[4];
+    if (!command.sync() || !item.sync()) {
+        await interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
+        return;
+    }
+
+    const qtyRaw = interaction.fields.getField("quantity");
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
+    if (!qtyRaw.value.trim().match(/^(?=.*\d)[\d\s,_-]+$/)) {
+        await interaction.editReply("Mauvais format! Nombre uniquement svp");
+        return;
+    }
+
+    let quantity = Number(qtyRaw.value.replace(/[\s_,-]+/g, ""));
+    if (quantity <= 0) {
+        await interaction.editReply(
+            "Merci de rentrer un nombre strictement positif (>0) !",
+        );
+        return;
+    }
+
+    // Clamp quantity
+    const progressions = CommandItemsProgression.fetchArray({
+        keys: "item_id",
+        values: item.id,
+    }) as CommandItemsProgression[];
+
+    const remaining = item.quantity - item.progress; // remaining reservable quantity
+    const reservedRemaining = progressions.reduce(
+        (acc, p) => acc + Math.max(0, p.reserved - p.progress),
+        0,
+    );
+
+    const availableToReserve = Math.max(0, remaining - reservedRemaining);
+
+    if (availableToReserve <= 0) {
+        await interaction.editReply("Toute la quantité est déjà réservée !");
+        return;
+    }
+
+    quantity = Math.min(quantity, availableToReserve);
+
+    // Create (or update) reservation
+    const prog = CommandItemsProgression.get({
+        keys: ["item_id", "user_id"],
+        values: [item.id, interaction.user.id],
+    }) as CommandItemsProgression | null;
+
+    if (prog) {
+        prog.reserved += quantity;
+        if (!prog.update()) {
+            await interaction.editReply("Erreur lors de la mise à jour de votre réservation.");
+            return;
+        }
+    } else {
+        // Create
+        const newProg = new CommandItemsProgression();
+        newProg.item_id = item.id;
+        newProg.user_id = interaction.user.id;
+        newProg.reserved = quantity;
+        newProg.progress = 0;
+
+        if (!newProg.insert()) {
+            await interaction.editReply("Erreur lors de la création de votre réservation.");
+            return;
+        }
+    }
+
+    if (item.message_id) await updateItem(command, item, config);
+    interaction.deleteReply();
+}
+
+// Confirm before completing item
 async function completeItemHandler(
+    interaction: ButtonInteraction,
+    _config: Config,
+) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const commandId = interaction.customId.split("|")[3];
+    const itemId = interaction.customId.split("|")[4];
+
+    const item: CommandItem | null = CommandItem.get({ keys: "id", values: itemId });
+    if (!item) {
+        await interaction.editReply("Erreur de Database, pas réussi à enregistrer l'interaction.");
+        return;
+    }
+
+    const confirmBut = new ButtonBuilder()
+        .setCustomId(
+            `|commander|completeItemConfirm|${commandId}|${itemId}`,
+        )
+        .setLabel("Oui")
+        .setStyle(ButtonStyle.Success);
+
+    const row =
+        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+            confirmBut,
+        );
+
+    await interaction.reply({
+        content: `Etes-vous sûr de vouloir marquer [**${item.item_name}** x${item.quantity}] comme **fini** ?`,
+        components: [row],
+        flags: MessageFlags.Ephemeral,
+    });
+}
+
+async function completeItemConfirm(
     interaction: ButtonInteraction,
     config: Config,
 ) {
@@ -1702,9 +1930,7 @@ async function completeItemHandler(
         return;
     }
 
-    if (item.message_id)
-        await updateItem(command, item, config, interaction.message);
-    if (command.panel_message_id) updatePanel(command, config);
+    if (item.message_id) await updateItem(command, item, config);
     interaction.deleteReply();
 }
 
@@ -1743,7 +1969,12 @@ module.exports = {
 
     advanceItemSend: advanceItemSend,
     advanceItemHandler: advanceItemHandler,
+
+    reserveItemSend: reserveItemSend,
+    reserveItemHandler: reserveItemHandler,
+
     completeItemHandler: completeItemHandler,
+    completeItemConfirm: completeItemConfirm,
 
     closeHandler: closeHandler,
     readyHandler: readyHandler,

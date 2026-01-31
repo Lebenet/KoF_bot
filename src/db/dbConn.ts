@@ -3,35 +3,35 @@ import Database from "better-sqlite3";
 export const reloadDummyDbTables = ".s..";
 
 declare global {
-    var __db: Database.Database | undefined;
+	var __db: Database.Database | undefined;
 }
 
 if (!globalThis.__db) {
-    const db = new Database("../db/database.db", {
-        nativeBinding:
-            "../node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-    });
-    //db.pragma("journal_mode = WAL");
+	const db = new Database("../db/database.db", {
+		nativeBinding:
+			"../node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+	});
+	//db.pragma("journal_mode = WAL");
 
-    globalThis.__db = db;
+	globalThis.__db = db;
 
-    process.on("exit", () => {
-        try {
-            // db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
-        } catch (err) {
-            console.error("Checkpoint failed on exit:", err);
-        }
-        db.close();
-    });
-    process.on("SIGINT", () => {
-        try {
-            // db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
-        } catch (err) {
-            console.error("Checkpoint failed on exit:", err);
-        }
-        db.close();
-        process.exit();
-    });
+	process.on("exit", () => {
+		try {
+			// db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
+		} catch (err) {
+			console.error("Checkpoint failed on exit:", err);
+		}
+		db.close();
+	});
+	process.on("SIGINT", () => {
+		try {
+			// db.pragma("wal_checkpoint(TRUNCATE)"); // Force flush + truncate WAL
+		} catch (err) {
+			console.error("Checkpoint failed on exit:", err);
+		}
+		db.close();
+		process.exit();
+	});
 }
 
 // Temporary disable saving database (for dev testing): ":memory:"
@@ -39,16 +39,16 @@ export const db = globalThis.__db as Database.Database;
 // export const ready = () => db.open;
 
 const tables = [
-    // Temporary
+	// Temporary
 
-    // `DROP TABLE IF EXISTS Commands;`,
-    // `DROP TABLE ChannelParams;`,
-    // `DROP TABLE Skills`,
-    // `DROP TABLE Users`,
-    // `DROP TABLE IF EXISTS Professions`,
+	// `DROP TABLE IF EXISTS Commands;`,
+	// `DROP TABLE ChannelParams;`,
+	// `DROP TABLE Skills`,
+	// `DROP TABLE Users`,
+	// `DROP TABLE IF EXISTS Professions`,
 
-    // End temporary
-    `CREATE TABLE IF NOT EXISTS Users(
+	// End temporary
+	`CREATE TABLE IF NOT EXISTS Users(
 		id TEXT PRIMARY KEY NOT NULL,
 		player_id TEXT,
 		username VARCHAR(255) NOT NULL DEFAULT "empty_username",
@@ -57,7 +57,7 @@ const tables = [
 		last_updated_skills DATETIME
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS Settlements (
+	`CREATE TABLE IF NOT EXISTS Settlements (
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		guild_id TEXT NOT NULL,
 		s_name TEXT NOT NULL,
@@ -65,14 +65,14 @@ const tables = [
 		member_count INTEGER NOT NULL DEFAULT 1,
 		UNIQUE (guild_id, s_name)
 	);`,
-    `CREATE TABLE IF NOT EXISTS SettlementMembers (
+	`CREATE TABLE IF NOT EXISTS SettlementMembers (
 		settlement_id INTEGER NOT NULL REFERENCES Settlements(id) ON DELETE CASCADE,
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 		perm_level INTEGER NOT NULL DEFAULT 0,
 		PRIMARY KEY (settlement_id, user_id)
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS ChannelParams(
+	`CREATE TABLE IF NOT EXISTS ChannelParams(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		channel_id TEXT NOT NULL,
 		guild_id TEXT NOT NULL,
@@ -82,19 +82,19 @@ const tables = [
 		UNIQUE(guild_id, settlement_id, command_name, command_param)
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS LastUpdateds(
+	`CREATE TABLE IF NOT EXISTS LastUpdateds(
 		table_name TEXT NOT NULL PRIMARY KEY,
 		last_updated DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS Empires(
+	`CREATE TABLE IF NOT EXISTS Empires(
 		entityId TEXT NOT NULL PRIMARY KEY,
 		e_name TEXT NOT NULL,
 		memberCount TEXT NOT NULL,
 		leader TEXT NOT NULL
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS SharedCraftsStatuss(
+	`CREATE TABLE IF NOT EXISTS SharedCraftsStatuss(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		guild_id TEXT NOT NULL,
 		channel_id TEXT NOT NULL,
@@ -102,7 +102,7 @@ const tables = [
 		UNIQUE (guild_id, channel_id, claim_id)
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS SharedCrafts(
+	`CREATE TABLE IF NOT EXISTS SharedCrafts(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		message_id TEXT NOT NULL,
 		entityId TEXT NOT NULL,
@@ -116,21 +116,21 @@ const tables = [
 		owner_name TEXT NOT NULL
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS WatchtowerStatuss(
+	`CREATE TABLE IF NOT EXISTS WatchtowerStatuss(
 		guild_id TEXT NOT NULL,
 		channel_id TEXT NOT NULL,
 		message_id TEXT NOT NULL,
 		empire_id TEXT NOT NULL REFERENCES Empires(entityId) ON DELETE CASCADE,
 		PRIMARY KEY (guild_id, channel_id, empire_id)
 	);`,
-    // `DROP TABLE IF EXISTS Watchtowers;`,
-    `CREATE TABLE IF NOT EXISTS Watchtowers(
+	// `DROP TABLE IF EXISTS Watchtowers;`,
+	`CREATE TABLE IF NOT EXISTS Watchtowers(
 		id TEXT PRIMARY KEY NOT NULL,
 		sieged BOOLEAN NOT NULL DEFAULT FALSE CHECK (sieged IN (0, 1))
 	);`,
 
-    // DO NOT DELETE, ONLY ALTER
-    `CREATE TABLE IF NOT EXISTS Professions(
+	// DO NOT DELETE, ONLY ALTER
+	`CREATE TABLE IF NOT EXISTS Professions(
 		p_name VARCHAR(255) NOT NULL PRIMARY KEY,
 		kind TEXT NOT NULL DEFAULT 'unknown',
 		description TEXT NOT NULL,
@@ -144,7 +144,7 @@ const tables = [
 		guild_id TEXT NOT NULL,
 		UNIQUE (role_id, guild_id)
 	);`,
-    `CREATE TABLE IF NOT EXISTS Fournisseurs (
+	`CREATE TABLE IF NOT EXISTS Fournisseurs (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 		guild_id TEXT NOT NULL,
@@ -153,7 +153,7 @@ const tables = [
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name) ON DELETE CASCADE,
 		UNIQUE(user_id, guild_id, settlement_id, profession_name)
 	);`,
-    `CREATE TABLE IF NOT EXISTS Skills(
+	`CREATE TABLE IF NOT EXISTS Skills(
 		user_id TEXT REFERENCES Users(id) ON DELETE CASCADE,
 		xp INTEGER NOT NULL DEFAULT 0,
 		level INTEGER NOT NULL DEFAULT 0,
@@ -161,7 +161,7 @@ const tables = [
 		PRIMARY KEY (user_id, profession_name)
 	);`,
 
-    `CREATE TABLE IF NOT EXISTS Commands(
+	`CREATE TABLE IF NOT EXISTS Commands(
 		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		guild_id TEXT NOT NULL,
 		settlement_id INTEGER REFERENCES Settlements(id) ON DELETE CASCADE,
@@ -175,21 +175,21 @@ const tables = [
 		last_edited DATETIME NOT NULL DEFAULT (datetime('now', 'localtime')),
 		author_id TEXT NOT NULL REFERENCES Users(id),
 	    status VARCHAR(255) NOT NULL DEFAULT "Profs",` /* Profs, Building, Ready */ +
-        `
+	`
 		ping BOOLEAN NOT NULL DEFAULT FALSE CHECK (ping IN (0, 1))
 	);`,
-    `CREATE TABLE IF NOT EXISTS CommandAssignees(
+	`CREATE TABLE IF NOT EXISTS CommandAssignees(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 		PRIMARY KEY(command_id, user_id)
 	);`,
-    `CREATE TABLE IF NOT EXISTS CommandProfessions(
+	`CREATE TABLE IF NOT EXISTS CommandProfessions(
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name) ON DELETE CASCADE,
 		filled BOOLEAN NOT NULL DEFAULT FALSE CHECK (filled IN (0, 1)),
 		PRIMARY KEY (command_id, profession_name)
 	);`,
-    `CREATE TABLE IF NOT EXISTS CommandItems (
+	`CREATE TABLE IF NOT EXISTS CommandItems (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
 		item_name TEXT NOT NULL,
@@ -197,22 +197,23 @@ const tables = [
 		progress INTEGER NOT NULL DEFAULT 0,
 		message_id TEXT
 	);`,
-    // to keep track of item progression
-    // lets the user "reserve" a part of the item progression
-    // many-to-many link table
-    `CREATE TABLE IF NOT EXISTS CommandItemsProgressions (
+	// to keep track of item progression
+	// lets the user "reserve" a part of the item progression
+	// many-to-many link table
+	`DROP TABLE IF EXISTS CommandItemsProgressions;`,
+	`CREATE TABLE IF NOT EXISTS CommandItemsProgressions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_id INTEGER NOT NULL REFERENCES CommandItems(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
         reserved INTEGER NOT NULL,
         progress INTEGER NOT NULL DEFAULT 0
     );`,
 
-    // TRIGGERS
+	// TRIGGERS
 
-    // Ensure settlement member perm level is owner if owner
-    `DROP TRIGGER IF EXISTS set_owner_settlement_perm_level`,
-    `CREATE TRIGGER IF NOT EXISTS set_owner_settlement_perm_level
+	// Ensure settlement member perm level is owner if owner
+	`DROP TRIGGER IF EXISTS set_owner_settlement_perm_level`,
+	`CREATE TRIGGER IF NOT EXISTS set_owner_settlement_perm_level
 	BEFORE INSERT ON SettlementMembers
 	FOR EACH ROW
 	WHEN EXISTS (
@@ -226,9 +227,9 @@ const tables = [
 		VALUES (NEW.settlement_id, NEW.user_id, -1);
 	END;`,
 
-    // Prevent from changing settlement owner perm level if still owner
-    `DROP TRIGGER IF EXISTS keep_owner_settlement_perm_level`,
-    `CREATE TRIGGER IF NOT EXISTS keep_owner_settlement_perm_level
+	// Prevent from changing settlement owner perm level if still owner
+	`DROP TRIGGER IF EXISTS keep_owner_settlement_perm_level`,
+	`CREATE TRIGGER IF NOT EXISTS keep_owner_settlement_perm_level
 	BEFORE UPDATE ON SettlementMembers
 	FOR EACH ROW
 	WHEN EXISTS (
@@ -240,9 +241,9 @@ const tables = [
 		SELECT RAISE(IGNORE);
 	END;`,
 
-    // Add owner to known members of new settlement with owner perm level
-    `DROP TRIGGER IF EXISTS add_owner_settlement_perm_level`,
-    `CREATE TRIGGER IF NOT EXISTS add_owner_settlement_perm_level
+	// Add owner to known members of new settlement with owner perm level
+	`DROP TRIGGER IF EXISTS add_owner_settlement_perm_level`,
+	`CREATE TRIGGER IF NOT EXISTS add_owner_settlement_perm_level
 	AFTER INSERT ON Settlements
 	FOR EACH ROW
 	BEGIN
@@ -252,17 +253,17 @@ const tables = [
 ];
 
 export function init() {
-    // Make sure every table exists correctly
-    console.log("[STARTUP] Making sure DB schema is correct...");
-    for (const table of tables) {
-        try {
-            db.exec(table);
-        } catch (err) {
-            console.log(table);
-            throw err;
-        }
-    }
-    console.log("[STARTUP] If no errors, then schema is correct.");
+	// Make sure every table exists correctly
+	console.log("[STARTUP] Making sure DB schema is correct...");
+	for (const table of tables) {
+		try {
+			db.exec(table);
+		} catch (err) {
+			console.log(table);
+			throw err;
+		}
+	}
+	console.log("[STARTUP] If no errors, then schema is correct.");
 }
 
 init();
