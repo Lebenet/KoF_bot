@@ -445,7 +445,7 @@ async function initHandler(
                         await thread.send(
                             `Erreur lors de l'ajout de l'item **${itemName}** *(x${qty})*.`,
                         );
-                    } catch { }
+                    } catch {}
                 } else {
                     itemList.push(item);
                     professionsSet.add(profession);
@@ -469,7 +469,7 @@ async function initHandler(
                         await thread.send(
                             `Erreur lors de l'ajout du métier **${profName}** aux tags du thread.`,
                         );
-                    } catch { }
+                    } catch {}
                 }
             }
         } else {
@@ -491,7 +491,7 @@ async function initHandler(
             components,
         });
 
-        await msg.pin().catch(() => { });
+        await msg.pin().catch(() => {});
 
         command.message_id = msg.id;
         if (!command.update()) {
@@ -551,7 +551,7 @@ async function initHandler(
                                 ),
                             ],
                         });
-                    } catch { }
+                    } catch {}
 
                     if (msg == null) {
                         item.delete();
@@ -559,7 +559,7 @@ async function initHandler(
                             .send(
                                 `L'item **${item.item_name}** n'a pas pu être créé (message send failed). Veuillez réessayer.`,
                             )
-                            .catch(() => { });
+                            .catch(() => {});
                         return;
                     }
 
@@ -567,13 +567,13 @@ async function initHandler(
                     item.message_id = msg.id;
                     if (!item.update()) {
                         // Ignore errors to not calcel while pipeline on fail
-                        msg.delete().catch(() => { });
+                        msg.delete().catch(() => {});
                         item.delete();
                         thread
                             .send(
                                 `L'item **${item.item_name}** n'a pas pu être créé (update failed). Veuillez réessayer.`,
                             )
-                            .catch(() => { });
+                            .catch(() => {});
                     } else await msg.pin();
                 })(item),
             );
@@ -686,9 +686,9 @@ async function manageProfessionsHandler(
             !f.name.toLowerCase().includes("informations")
                 ? f
                 : {
-                    name: "Professions:",
-                    value: profs.map((p) => p.profession_name).join(", "),
-                },
+                      name: "Professions:",
+                      value: profs.map((p) => p.profession_name).join(", "),
+                  },
         ),
     );
 
@@ -758,7 +758,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
                 components: [],
             });
         }
-    } catch { }
+    } catch {}
 
     const thread = interaction.channel as ThreadChannel;
     await thread.delete();
@@ -891,18 +891,17 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     const profsRoles: ProfessionLink[] = ProfessionLink.fetchArray({
         keys: "guild_id",
         values: command.guild_id,
-    }).filter((link: ProfessionLink) => profsPing.includes(link.profession_name));
+    }).filter((link: ProfessionLink) =>
+        profsPing.includes(link.profession_name),
+    );
     // Build ping message
     let pingMsg = "";
     if (command.ping && profsPing.length > 0) {
         const thread = (await config.bot.channels.fetch(
             command.thread_id,
         )) as ThreadChannel;
-        const mentionStr = profsRoles
-            .map((l) => `<@&${l.role_id}>`)
-            .join(" ");
-        pingMsg =
-            `Nouvelle commande pour les métiers: ${mentionStr}`
+        const mentionStr = profsRoles.map((l) => `<@&${l.role_id}>`).join(" ");
+        pingMsg = `Nouvelle commande pour les métiers: ${mentionStr}`;
         await thread.send(pingMsg);
     }
 
@@ -912,7 +911,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     if (!forumId) {
         await interaction.editReply(
             "Failed to apply tags for this post.\n" +
-            "Please apply them manually.",
+                "Please apply them manually.",
         );
         return;
     }
@@ -923,7 +922,7 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     if (!forum) {
         await interaction.editReply(
             "Failed to apply tags for this post.\n" +
-            "Please apply them manually.",
+                "Please apply them manually.",
         );
         return;
     }
@@ -1012,8 +1011,8 @@ async function assignHandler(
     const users = interaction.users;
     const thread = await (
         (await config.bot.channels.fetch(chan.channel_id)) as
-        | ForumChannel
-        | TextChannel
+            | ForumChannel
+            | TextChannel
     ).threads.fetch(command.thread_id);
     if (!thread) {
         interaction
@@ -1101,8 +1100,8 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 
         panelMsg = (await (
             (await config.bot.channels.fetch(panel.channel_id)) as
-            | TextChannel
-            | undefined
+                | TextChannel
+                | undefined
         )?.messages.fetch(command.panel_message_id!)) as Message | undefined;
 
         if (!panelMsg) {
@@ -1129,8 +1128,8 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 
         thread = (await (
             (await config.bot.channels.fetch(chan.channel_id)) as
-            | ForumChannel
-            | TextChannel
+                | ForumChannel
+                | TextChannel
         ).threads.fetch(command.thread_id)) as
             | ForumThreadChannel
             | TextThreadChannel;
@@ -1432,8 +1431,8 @@ async function addItemsHandler(
 
     const thread = await (
         (await config.bot.channels.fetch(channel.channel_id)) as
-        | TextChannel
-        | ForumChannel
+            | TextChannel
+            | ForumChannel
     ).threads.fetch(command.thread_id);
     if (!thread) return;
 
@@ -1454,7 +1453,7 @@ async function addItemsHandler(
     collector.on("collect", async (m) => {
         try {
             await m.delete();
-        } catch { }
+        } catch {}
     });
 
     interaction.fields.fields.forEach(async (f) => {
@@ -1554,10 +1553,11 @@ async function updateItem(
     // remove all reservations if item is completed
     if (item.progress >= item.quantity) {
         await message.delete();
-        const progs: CommandItemsProgression[] = CommandItemsProgression.fetchArray({
-            keys: "item_id",
-            values: item.id,
-        });
+        const progs: CommandItemsProgression[] =
+            CommandItemsProgression.fetchArray({
+                keys: "item_id",
+                values: item.id,
+            });
         progs.forEach((p) => p.delete());
     } else await message.edit(getItemComponents(item));
 
@@ -1831,7 +1831,9 @@ async function reserveItemHandler(
     if (prog) {
         prog.reserved += quantity;
         if (!prog.update()) {
-            await interaction.editReply("Erreur lors de la mise à jour de votre réservation.");
+            await interaction.editReply(
+                "Erreur lors de la mise à jour de votre réservation.",
+            );
             return;
         }
     } else {
@@ -1843,7 +1845,9 @@ async function reserveItemHandler(
         newProg.progress = 0;
 
         if (!newProg.insert()) {
-            await interaction.editReply("Erreur lors de la création de votre réservation.");
+            await interaction.editReply(
+                "Erreur lors de la création de votre réservation.",
+            );
             return;
         }
     }
@@ -1862,16 +1866,19 @@ async function completeItemHandler(
     const commandId = interaction.customId.split("|")[3];
     const itemId = interaction.customId.split("|")[4];
 
-    const item: CommandItem | null = CommandItem.get({ keys: "id", values: itemId });
+    const item: CommandItem | null = CommandItem.get({
+        keys: "id",
+        values: itemId,
+    });
     if (!item) {
-        await interaction.editReply("Erreur de Database, pas réussi à enregistrer l'interaction.");
+        await interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
         return;
     }
 
     const confirmBut = new ButtonBuilder()
-        .setCustomId(
-            `|commander|completeItemConfirm|${commandId}|${itemId}`,
-        )
+        .setCustomId(`|commander|completeItemConfirm|${commandId}|${itemId}`)
         .setLabel("Oui")
         .setStyle(ButtonStyle.Success);
 
