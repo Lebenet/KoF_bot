@@ -200,7 +200,6 @@ const tables = [
     // to keep track of item progression
     // lets the user "reserve" a part of the item progression
     // many-to-many link table
-    `DROP TABLE IF EXISTS CommandItemsProgressions;`,
     `CREATE TABLE IF NOT EXISTS CommandItemsProgressions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_id INTEGER NOT NULL REFERENCES CommandItems(id) ON DELETE CASCADE,

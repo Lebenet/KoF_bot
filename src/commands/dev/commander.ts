@@ -1890,7 +1890,6 @@ async function completeItemHandler(
     await interaction.reply({
         content: `Etes-vous sûr de vouloir marquer [**${item.item_name}** x${item.quantity}] comme **fini** ?`,
         components: [row],
-        flags: MessageFlags.Ephemeral,
     });
 }
 
