@@ -1887,7 +1887,7 @@ async function completeItemHandler(
             confirmBut,
         );
 
-    await interaction.reply({
+    await interaction.editReply({
         content: `Etes-vous sûr de vouloir marquer [**${item.item_name}** x${item.quantity}] comme **fini** ?`,
         components: [row],
     });
@@ -1936,8 +1936,12 @@ async function completeItemConfirm(
         return;
     }
 
+    // update panel and recap
     if (item.message_id) await updateItem(command, item, config);
-    interaction.deleteReply();
+    // remove the original ephemeral message
+    await interaction.webhook.deleteMessage(interaction.message.id);
+    // remove the awaited answer
+    await interaction.deleteReply();
 }
 
 module.exports = {
