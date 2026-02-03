@@ -137,7 +137,7 @@ const tables = [
 		emoji TEXT NOT NULL DEFAULT "⁉️",
 		skill_id INTEGER NOT NULL DEFAULT 0
 	);`,
-	`CREATE TABLE IF NOT EXISTS ProfessionLinks(
+    `CREATE TABLE IF NOT EXISTS ProfessionLinks(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		profession_name VARCHAR(255) NOT NULL REFERENCES Professions(p_name),
 		role_id TEXT NOT NULL,
@@ -197,6 +197,16 @@ const tables = [
 		progress INTEGER NOT NULL DEFAULT 0,
 		message_id TEXT
 	);`,
+    // to keep track of item progression
+    // lets the user "reserve" a part of the item progression
+    // many-to-many link table
+    `CREATE TABLE IF NOT EXISTS CommandItemsProgressions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id INTEGER NOT NULL REFERENCES CommandItems(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+        reserved INTEGER NOT NULL,
+        progress INTEGER NOT NULL DEFAULT 0
+    );`,
 
     // TRIGGERS
 

@@ -439,6 +439,12 @@ export class Model {
     }
 }
 
+export type id_t =
+    | number
+    | bigint
+    | string
+;
+
 export class User extends Model {
     public id!: string;
     public player_id?: string | null;
@@ -690,6 +696,14 @@ export class CommandItem extends Model {
     public progress!: number;
     public message_id?: string | undefined;
 }
+
+export class CommandItemsProgression extends Model {
+    public id!: id_t;
+    public item_id!: id_t;
+    public user_id!: string; // snowflakes can only be strings for accuracy
+    public reserved!: number;
+    public progress!: number;
+};
 
 export class CommandProfession extends Model {
     public command_id!: number | bigint | string;
