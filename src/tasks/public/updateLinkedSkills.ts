@@ -30,9 +30,9 @@ async function updateLinkedSkills(data: TaskData, _config: Config) {
         await setTimeout(interval);
     }
 
-    console.log(`Updated skills for ${vc}/${len} linked users.`);
-    console.log("updating gsheets...");
-    await updateGsheetsSkills();
+    // console.log(`Updated skills for ${vc}/${len} linked users.`);
+    // console.log("updating gsheets...");
+    // await updateGsheetsSkills();
 }
 
 module.exports = {
