@@ -361,8 +361,8 @@ module.exports = {
         name: "Update Watchtowers Watchers",
         interval: 15,
         time: null,
-        autoStart: true,
-        runOnStart: true,
+        autoStart: false, // set to true later
+        runOnStart: false, // set to true later
         repeat: 0,
         notResetOnReload: true,
     },
