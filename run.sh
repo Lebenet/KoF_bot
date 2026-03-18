@@ -10,6 +10,8 @@ chmod +x ./scripts/start_tsc.sh
 pkill -f "start_tsc"
 
 # Clean dist
+# forced to do this smh
+docker run --rm -v $(pwd):/data -w /data alpine rm -rf dist/
 rm -rf dist
 mkdir -p dist db
 mkdir -p dist/{commands,tasks}/{public,dev} dist/data dist/temp dist/db
