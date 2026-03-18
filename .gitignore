@@ -147,3 +147,4 @@ dist
 **/temp/
 processes/*
 *.swp
+.idea/
