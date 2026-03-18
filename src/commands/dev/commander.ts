@@ -147,7 +147,7 @@ function generateCommandReport(
     timeout: number = 300,
 ): string {
     // For now, generate them in the /dist directory
-    const dirPath: string = path.parse(`/usr/bot/dist/tmp/commander/${command.id}/`).dir;
+    const dirPath: string = `/usr/bot/dist/tmp/commander/${command.id}`;
     const filePath: string = path.join(dirPath, "report.txt");
     // this is just to make sure
     fs.mkdirSync(dirPath, {
