@@ -208,6 +208,16 @@ const tables = [
         progress INTEGER NOT NULL DEFAULT 0
     );`,
 
+    // To generate a report upon closure
+    // Had to add this separately because contributions to items were not kept, only progress
+    `CREATE TABLE IF NOT EXISTS CommandContributions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES Users(id) ON DELETE SET NULL,
+        action TEXT NOT NULL,
+		timestamp DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );`,
+
     // TRIGGERS
 
     // Ensure settlement member perm level is owner if owner

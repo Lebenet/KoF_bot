@@ -688,6 +688,18 @@ export class Command extends Model {
     };
 }
 
+export class CommandContribution extends Model {
+    public id!: number | bigint | string;
+    public command_id!: number | bigint | string;
+    public user_id!: string;
+    public action!: string;
+    public timestamp!: Date;
+
+    override fieldTypes: Record<string, FieldType> = {
+        timestamp: "Date",
+    };
+}
+
 export class CommandItem extends Model {
     public id!: number | bigint | string;
     public command_id!: number | bigint | string;
