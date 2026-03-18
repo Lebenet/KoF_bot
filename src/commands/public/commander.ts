@@ -50,6 +50,7 @@ import {
     Settlement,
     ProfessionLink,
     CommandItemsProgression,
+    CommandContribution,
 } from "../../db/dbTypes";
 
 import {
@@ -60,6 +61,8 @@ import {
     shortenText,
     shortenTitle,
 } from "../../utils/discordUtils";
+import fs from "fs";
+import path from "path";
 
 function generateShortId(): string {
     return Math.random().toString(36).substring(2, 6);
@@ -136,6 +139,71 @@ function getCommandButtons(
         );
 
     return [row1, row2, row3];
+}
+
+// TODO: for temporary reports, add a unique identifier to avoid conflicts on the same command
+function generateCommandReport(
+    command: Command,
+    timeout: number = 300,
+): string {
+    // For now, generate them in the /dist directory
+    const dirPath: string = `/usr/bot/dist/tmp/commander/${command.id}`;
+    const filePath: string = path.join(dirPath, "report.txt");
+    // this is just to make sure
+    fs.mkdirSync(dirPath, {
+        recursive: true,
+    });
+    fs.writeFileSync(filePath, "");
+    // Report header
+    const itemsStr: string = CommandItem.fetchArray({
+        keys: "command_id",
+        values: command.id,
+    })
+        .map((item) => `\t- ${item.toString(true)}`)
+        .join("\n");
+    fs.appendFileSync(
+        filePath,
+        `=== Close Report for command (${command.id}) ${command.c_name} ===\n\n` +
+            `\tDescription: '${command.description}'\n` +
+            `\tDestination chest: '${command.chest ?? "unspecified"}'\n` +
+            `\tItems:\n` +
+            (itemsStr.length > 0 ? itemsStr : "\t- No items specified") +
+            "\n\n-==== Actions History: ====-\n\n",
+    );
+
+    // Write user action report, in timestamp ascending order
+    fs.appendFileSync(
+        filePath,
+        CommandContribution.fetchArray({
+            keys: "command_id",
+            values: command.id,
+        })
+            .sort(
+                (a, b) =>
+                    a.timestamp.getMilliseconds() -
+                    b.timestamp.getMilliseconds(),
+            )
+            .map(
+                (log) =>
+                    `[${log.timestamp}]: ${User.get({ keys: "id", values: log.user_id })?.username ?? "Unknown user"} (${log.user_id}): ${log.action}`,
+            )
+            .join("\n") + "\n",
+    );
+
+    // Delete report after timeout (defaults to 5 mins) if > 0
+    if (timeout > 0)
+        setTimeout(() => {
+            fs.rm(filePath, { force: true }, (err) => {
+                if (err != null)
+                    console.error(
+                        `Failed to delete temporary report file '${filePath}': ${err}`,
+                    );
+                else console.log(`Deleting temporary report file '${filePath}'...`);
+            });
+        }, timeout * 1000);
+
+    // Return path to log file
+    return filePath;
 }
 
 async function order(
@@ -597,6 +665,10 @@ async function initHandler(
         await interaction.editReply(
             `Votre commande peut être __complétée__ dans **<#${thread.id}>** !`,
         );
+
+        // Log command creation
+        CommandContribution.log(command, `Created command '${command.c_name}'`);
+
         setTimeout(() => interaction.deleteReply().catch(), 15_000);
     }
 }
@@ -606,6 +678,7 @@ async function pingProfsHandler(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -630,6 +703,13 @@ async function pingProfsHandler(
         components,
     });
 
+    // Log action
+    CommandContribution.log(
+        command,
+        `Profession ping ${command.ping ? "" : "de"}activated`,
+        interaction.user.id,
+    );
+
     // Delete reply if everything went well
     await interaction.deleteReply();
 }
@@ -639,6 +719,7 @@ async function manageProfessionsHandler(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     // Get database command
     const command = new Command();
@@ -697,11 +778,20 @@ async function manageProfessionsHandler(
         components: getCommandButtons(command),
     });
 
+    // Build log message
+    const profsStr: string = profs.map((p) => p.profession_name).join(", ");
+    CommandContribution.log(
+        command,
+        `Added professions '${profsStr}'`,
+        interaction.user.id,
+    );
+
     await interaction.deleteReply();
 }
 
 async function closeHandler(interaction: ButtonInteraction, config: Config) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -719,6 +809,16 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
         await interaction.editReply("Cette commande ne vous appartient pas.");
         return;
     }
+
+    // Log close (will still log even if unsuccessful)
+    CommandContribution.log(
+        command,
+        `Closed command '${command.c_name}'`,
+        interaction.user.id,
+    );
+
+    const reportFilepath: string = generateCommandReport(command, -1);
+    console.log(`Generated report at '${reportFilepath}'`);
 
     if (!command.delete()) {
         await interaction.editReply(
@@ -756,6 +856,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
                 content: "Commande terminée.",
                 embeds: embeds,
                 components: [],
+                files: [reportFilepath],
             });
         }
     } catch {}
@@ -764,6 +865,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
     await thread.delete();
 
     const msg = await interaction.user.send("Commande supprimée avec succès");
+
     setTimeout(
         () =>
             msg
@@ -780,6 +882,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
 
 async function readyHandler(interaction: ButtonInteraction, config: Config) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -949,6 +1052,13 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     // apply them (only the first 5, discord limitation)
     await post.setAppliedTags(toApply.slice(0, 5));
 
+    // Log
+    CommandContribution.log(
+        command,
+        `Marked command as 'Ready'`,
+        interaction.user.id,
+    );
+
     await interaction.deleteReply();
 }
 
@@ -957,6 +1067,7 @@ async function assignHandler(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -1062,6 +1173,20 @@ async function assignHandler(
         embeds: [embed],
         components: interaction.message.components,
     });
+
+    // Log assignment
+    const usersStr: string = users
+        .map((user) =>
+            user.id == interaction.user.id
+                ? "(himself)"
+                : `${user.displayName} (${user.id})`,
+        )
+        .join(", ");
+    CommandContribution.log(
+        command,
+        `Assigned following contributors: [${usersStr}]`,
+        interaction.user.id,
+    );
 
     await interaction.deleteReply();
 }
@@ -1173,6 +1298,13 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
             embeds: [embed],
             components: panelMsg.components,
         });
+
+    // Log
+    CommandContribution.log(
+        command,
+        `Assigned himself to the command`,
+        interaction.user.id,
+    );
 
     await interaction.deleteReply();
 }
@@ -1405,6 +1537,7 @@ async function addItemsHandler(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -1456,6 +1589,8 @@ async function addItemsHandler(
         } catch {}
     });
 
+    const itemsList: CommandItem[] = [];
+
     interaction.fields.fields.forEach(async (f) => {
         const val = f.value.trim();
         if (!val) return;
@@ -1478,6 +1613,7 @@ async function addItemsHandler(
         }
         if (!item.item_name || !item.quantity) return;
         item.progress = 0;
+        itemsList.push(item);
 
         if (!item.insert()?.sync()) return;
 
@@ -1519,6 +1655,16 @@ async function addItemsHandler(
         embeds: srcMsg.embeds,
         components: srcMsg.components,
     });
+
+    // Log
+    const itemsStr: string = itemsList
+        .map((item) => item.toString())
+        .join(", ");
+    CommandContribution.log(
+        command,
+        `Added the following items to the command: [${itemsStr}]`,
+        interaction.user.id,
+    );
 
     // Delete reply
     await interaction.deleteReply();
@@ -1660,6 +1806,7 @@ async function advanceItemHandler(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -1708,13 +1855,36 @@ async function advanceItemHandler(
         progression.progress += added;
         if (progression.progress >= progression.reserved) {
             progression.delete();
+            command.log(
+                `Completed his reservation on item '${item.item_name}'${progression.progress == progression.reserved ? "" : `and contributed an additional '${progression.progress - progression.reserved}'`}`,
+                interaction.user.id,
+            );
         } else {
             progression.update();
+            // Log
+            command.log(
+                `Progressed his reservation on item '${item.item_name}' by '${added}'`,
+                interaction.user.id,
+            );
         }
-    }
+
+        if (item.progress >= item.quantity)
+            command.log(
+                `Completed item '${item.item_name}' by progressing his reservation`,
+                interaction.user.id,
+            );
+    } // Log
+    else
+        command.log(
+            item.progress >= item.quantity
+                ? `Completed item '${item.item_name}' by providing '${added}' units`
+                : `Progressed quantity '${added}' to item '${item.item_name}'`,
+            interaction.user.id,
+        );
 
     if (item.message_id) await updateItem(command, item, config);
     if (command.panel_message_id) updatePanel(command, config);
+
     interaction.deleteReply();
 }
 
@@ -1774,6 +1944,7 @@ async function reserveItemHandler(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -1852,7 +2023,14 @@ async function reserveItemHandler(
         }
     }
 
+    // Log
+    command.log(
+        `Reserved quantity '${quantity}' on item '${item.item_name}'`,
+        interaction.user.id,
+    );
+
     if (item.message_id) await updateItem(command, item, config);
+
     interaction.deleteReply();
 }
 
@@ -1898,6 +2076,7 @@ async function completeItemConfirm(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
@@ -1935,6 +2114,9 @@ async function completeItemConfirm(
         );
         return;
     }
+
+    // Log
+    command.log(`Completed item '${item.item_name}'`, interaction.user.id);
 
     // update panel and recap
     if (item.message_id) await updateItem(command, item, config);
