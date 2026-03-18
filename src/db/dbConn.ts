@@ -210,7 +210,6 @@ const tables = [
 
     // To generate a report upon closure
     // Had to add this separately because contributions to items were not kept, only progress
-    `DROP TABLE CommandContributions;`,
     `CREATE TABLE IF NOT EXISTS CommandContributions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         command_id INTEGER NOT NULL REFERENCES Commands(id) ON DELETE CASCADE,
