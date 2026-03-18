@@ -367,6 +367,7 @@ export class Model {
             const res: Database.RunResult = db.prepare(sql).run(...values);
             this._inserted = true;
 
+            // note: this WILL break in a non-transactional environment lmao just realised
             if (Object.keys(this).includes("id") && !this["id"]) {
                 this["id"] = (
                     db.prepare("SELECT last_insert_rowid()").get() as any
@@ -665,6 +666,28 @@ export class Skill extends Model {
     }
 }
 
+export class CommandContribution extends Model {
+    public id!: number | bigint | string;
+    public command_id!: number | bigint | string;
+    public user_id!: string;
+    public action!: string;
+    public timestamp!: Date;
+
+    override fieldTypes: Record<string, FieldType> = {
+        timestamp: "Date",
+    };
+
+    // To simplify logging contributions
+    public static log(command: Command, action: string, userId?: string): void {
+        const log: CommandContribution = new CommandContribution();
+        log.command_id = command.id;
+        log.user_id = userId ? userId : command.author_id;
+        log.action = action;
+        // console.log(log.command_id, log.user_id, log.action);
+        log.insert();
+    }
+}
+
 export class Command extends Model {
     public id!: number | bigint | string;
     public guild_id!: string;
@@ -686,6 +709,10 @@ export class Command extends Model {
         self_supplied: "boolean",
         ping: "boolean",
     };
+
+    public log(action: string, userId?: string): void {
+        CommandContribution.log(this, action, userId);
+    }
 }
 
 export class CommandItem extends Model {
@@ -695,6 +722,11 @@ export class CommandItem extends Model {
     public quantity!: number;
     public progress!: number;
     public message_id?: string | undefined;
+
+    public toString(progress: boolean = false): string{
+        const prgStr: string = progress ? `[${Math.min(this.progress, this.quantity)}/${this.quantity}]` : `(x${this.quantity})`;
+        return `${this.item_name} ${prgStr}`;
+    }
 }
 
 export class CommandItemsProgression extends Model {
