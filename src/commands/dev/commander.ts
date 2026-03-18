@@ -62,6 +62,7 @@ import {
     shortenTitle,
 } from "../../utils/discordUtils";
 import fs from "fs";
+import path from "path";
 
 function generateShortId(): string {
     return Math.random().toString(36).substring(2, 6);
@@ -140,34 +141,39 @@ function getCommandButtons(
     return [row1, row2, row3];
 }
 
+// TODO: for temporary reports, add a unique identifier to avoid conflicts on the same command
 function generateCommandReport(
     command: Command,
     timeout: number = 300,
 ): string {
     // For now, generate them in the /dist directory
-    const fileName: string = `/usr/bot/dist/tmp/command/report/${command.id}`;
+    const dirPath: string = path.parse(`/usr/bot/dist/tmp/commander/${command.id}/`).dir;
+    const filePath: string = path.join(dirPath, "report.txt");
     // this is just to make sure
-    fs.mkdirSync(`/usr/bot/dist/tmp/command/report`, { recursive: true });
-    fs.writeFileSync(fileName, "");
+    fs.mkdirSync(dirPath, {
+        recursive: true,
+    });
+    fs.writeFileSync(filePath, "");
     // Report header
-    const itemsStr: string = CommandItem.fetchArray({ keys: "command_id", values: command.id })
-        .map(
-            (item) =>
-                `\t- ${item.toString(true)}`,
-        )
+    const itemsStr: string = CommandItem.fetchArray({
+        keys: "command_id",
+        values: command.id,
+    })
+        .map((item) => `\t- ${item.toString(true)}`)
         .join("\n");
     fs.appendFileSync(
-        fileName,
+        filePath,
         `=== Close Report for command (${command.id}) ${command.c_name} ===\n\n` +
             `\tDescription: '${command.description}'\n` +
             `\tDestination chest: '${command.chest ?? "unspecified"}'\n` +
-            `\tItems:\n` + (itemsStr.length > 0 ? itemsStr : "\t- No items specified") +
+            `\tItems:\n` +
+            (itemsStr.length > 0 ? itemsStr : "\t- No items specified") +
             "\n\n-==== Actions History: ====-\n\n",
     );
 
     // Write user action report, in timestamp ascending order
     fs.appendFileSync(
-        fileName,
+        filePath,
         CommandContribution.fetchArray({
             keys: "command_id",
             values: command.id,
@@ -184,19 +190,20 @@ function generateCommandReport(
             .join("\n") + "\n",
     );
 
-    // Delete report after timeout (defaults to 5 mins)
-    setTimeout(() => {
-        fs.rm(fileName, (err) => {
-            if (err != null)
-                console.error(
-                    `Failed to delete temporary report file '${fileName}': ${err}`,
-                );
-            else console.log(`Deleting temporary report file '${fileName}'...`);
-        });
-    }, timeout * 1000);
+    // Delete report after timeout (defaults to 5 mins) if > 0
+    if (timeout > 0)
+        setTimeout(() => {
+            fs.rm(filePath, { force: true }, (err) => {
+                if (err != null)
+                    console.error(
+                        `Failed to delete temporary report file '${filePath}': ${err}`,
+                    );
+                else console.log(`Deleting temporary report file '${filePath}'...`);
+            });
+        }, timeout * 1000);
 
     // Return path to log file
-    return fileName;
+    return filePath;
 }
 
 async function order(
@@ -810,8 +817,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
         interaction.user.id,
     );
 
-    // TODO: Send generated report back to client
-    const reportFilepath: string = generateCommandReport(command);
+    const reportFilepath: string = generateCommandReport(command, -1);
     console.log(`Generated report at '${reportFilepath}'`);
 
     if (!command.delete()) {
@@ -850,6 +856,7 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
                 content: "Commande terminée.",
                 embeds: embeds,
                 components: [],
+                files: [reportFilepath],
             });
         }
     } catch {}
@@ -1650,7 +1657,9 @@ async function addItemsHandler(
     });
 
     // Log
-    const itemsStr: string = itemsList.map((item) => item.toString()).join(", ");
+    const itemsStr: string = itemsList
+        .map((item) => item.toString())
+        .join(", ");
     CommandContribution.log(
         command,
         `Added the following items to the command: [${itemsStr}]`,
@@ -1859,7 +1868,11 @@ async function advanceItemHandler(
             );
         }
 
-        if (item.progress >= item.quantity) command.log(`Completed item '${item.item_name}' by progressing his reservation`, interaction.user.id);
+        if (item.progress >= item.quantity)
+            command.log(
+                `Completed item '${item.item_name}' by progressing his reservation`,
+                interaction.user.id,
+            );
     } // Log
     else
         command.log(
