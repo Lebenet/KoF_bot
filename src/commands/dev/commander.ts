@@ -20,11 +20,7 @@ import {
     Colors,
     ButtonStyle,
     MessageActionRowComponentBuilder,
-    MessageActionRowComponent,
     APIEmbed,
-    ComponentType,
-    ActionRow,
-    ButtonComponent,
     UserSelectMenuBuilder,
     UserSelectMenuInteraction,
     Message,
@@ -33,8 +29,9 @@ import {
     ForumThreadChannel,
     Attachment,
     Snowflake,
-    GuildForumTag,
     BaseMessageOptions,
+    Interaction,
+    MessageComponentInteraction,
 } from "discord.js";
 
 import { Config } from "../../utils/configLoader";
@@ -198,12 +195,92 @@ function generateCommandReport(
                     console.error(
                         `Failed to delete temporary report file '${filePath}': ${err}`,
                     );
-                else console.log(`Deleting temporary report file '${filePath}'...`);
+                else
+                    console.log(
+                        `Deleting temporary report file '${filePath}'...`,
+                    );
             });
         }, timeout * 1000);
 
     // Return path to log file
     return filePath;
+}
+
+/**
+ * Assigns a discord user to a DB command.
+ * @param command The related command.
+ * @param userId The Discord snowflake of the user.
+ * @return The {@link CommandAssignee} if successful,
+ * {@linkcode undefined} if the user was already assigned to that command,
+ * or {@linkcode null} if something went wrong.
+ */
+function assignUser(
+    command: Command,
+    userId: string,
+): CommandAssignee | null | undefined {
+    // Create assignment
+    const assign = new CommandAssignee();
+    assign.command_id = command.id;
+    assign.user_id = userId;
+
+    // If it already exists, don't push it
+    if (assign.sync()) return undefined;
+
+    // Try to insert in DB
+    if (!assign.insert()) return null;
+
+    // return result
+    return assign;
+}
+
+// Ownership check
+function isOwner(
+    command: Command,
+    userId: string,
+    config: Config,
+    adminBypass: boolean = true,
+): boolean {
+    return (
+        userId === command.author_id ||
+        (adminBypass && config.admins?.includes(userId))
+    );
+}
+
+async function getCommand(
+    interaction: MessageComponentInteraction,
+    config: Config,
+    options: { checkOwnership?: boolean; adminBypass?: boolean; deferred?: boolean } = {
+        checkOwnership: true,
+        adminBypass: true,
+        deferred: true,
+    },
+): Promise<Command | null> {
+    // Retrieve command from db
+    const command = new Command();
+    command.id = interaction.customId.split("|")[3];
+    if (!command.sync()) {
+        const msg: string = "Erreur de Database, pas réussi à enregistrer l'interaction.;
+        if (options.deferred)
+            await interaction.editReply(msg);
+        else
+            await interaction.reply(msg);
+        return null;
+    }
+
+    // Check for ownership, if necessary
+    if (
+        options.checkOwnership &&
+        !isOwner(command, interaction.user.id, config, options.adminBypass)
+    ) {
+        const msg: string = "Cette commande ne vous appartient pas!";
+        if (options.deferred)
+            await interaction.editReply(msg);
+        else
+            await interaction.reply(msg);
+        return null;
+    }
+
+    return command;
 }
 
 async function order(
@@ -680,12 +757,8 @@ async function pingProfsHandler(
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const command = new Command();
-    command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
-        await interaction.editReply(
-            "Erreur de Database, pas réussi à enregistrer l'interaction.",
-        );
+    const command: Command | null = await getCommand(interaction, config);
+    if (!command) {
         return;
     }
 
@@ -722,23 +795,8 @@ async function manageProfessionsHandler(
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     // Get database command
-    const command = new Command();
-    command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
-        await interaction.editReply(
-            "Erreur de Database, pas réussi à enregistrer l'interaction.",
-        );
-        return;
-    }
-
-    // Ownership check
-    if (
-        interaction.user.id !== command.author_id &&
-        !config.admins?.includes(interaction.user.id)
-    ) {
-        await interaction.editReply("Cette commande ne vous appartient pas.");
-        return;
-    }
+    const command: Command | null = await getCommand(interaction, config);
+    if (!command) return;
 
     // Update command status
     command.status = "Building";
@@ -793,22 +851,8 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const command = new Command();
-    command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
-        await interaction.editReply(
-            "Erreur de Database, pas réussi à enregistrer l'interaction.",
-        );
-        return;
-    }
-
-    if (
-        interaction.user.id !== command.author_id &&
-        !config.admins?.includes(interaction.user.id)
-    ) {
-        await interaction.editReply("Cette commande ne vous appartient pas.");
-        return;
-    }
+    const command: Command | null = await getCommand(interaction, config);
+    if (!command) return;
 
     // Log close (will still log even if unsuccessful)
     CommandContribution.log(
@@ -884,22 +928,8 @@ async function readyHandler(interaction: ButtonInteraction, config: Config) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const command = new Command();
-    command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
-        await interaction.editReply(
-            "Erreur de Database, pas réussi à enregistrer l'interaction.",
-        );
-        return;
-    }
-
-    if (
-        interaction.user.id !== command.author_id &&
-        !config.admins?.includes(interaction.user.id)
-    ) {
-        await interaction.editReply("Cette commande ne vous appartient pas.");
-        return;
-    }
+    const command: Command | null = await getCommand(interaction, config);
+    if (!command) return;
 
     // Get interaction message to edit components and embed
     const msg = interaction.message;
@@ -1130,39 +1160,31 @@ async function assignHandler(
             .editReply("Le thread de la commande a été supprimé !")
             .catch(console.log);
         command.delete();
-        interaction.message.delete();
+        await interaction.message.delete();
         return;
     }
 
     await interaction.editReply("Création des rôles dans la bdd...");
 
-    const insertAssignees: CommandAssignee[] = [];
+    let reply: string = "";
     for (const [id, user] of users) {
-        // Create assignment
-        const assign = new CommandAssignee();
-        assign.command_id = command.id;
-        assign.user_id = id;
-
         // Make sure user is registered in the DB
         User.ensureUserExists(id, user.displayName);
 
-        // If it already exists, don't push it
-        if (assign.sync()) continue;
-
-        // Try to insert in DB
-        if (!assign.insert()) {
-            interaction
-                .editReply("Erreur de Database, veuillez réessayer.")
-                .catch(console.log);
-            insertAssignees.forEach((a) => a.delete());
-            return;
+        // defer assignment to helper
+        const assignee: CommandAssignee | null | undefined = assignUser(
+            command,
+            user.id,
+        );
+        if (assignee) {
+            // Add them to the thread
+            thread.members.add(user);
         }
-
-        // List of inserted assignees
-        insertAssignees.push(assign);
-
-        // Add them to the thread
-        thread.members.add(user);
+        // undefined means it just was already inserted
+        else if (assignee === null) {
+            reply += "Something went wrong for user with id " + user.id + "\n";
+            interaction.editReply(reply).catch(console.log);
+        }
     }
 
     // Edit assigned members
@@ -1203,7 +1225,7 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
-    // TODO: Make it so that only people from the right profession can claim to be apart of this order
+    // Maybe?: Make it so that only people from the right profession can claim to be apart of this order
 
     let thread: ThreadChannel | undefined;
     let panelMsg: Message | undefined;
@@ -1278,17 +1300,23 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
         }
     }
 
+    // Make sure no db error related to this user
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const assign = new CommandAssignee();
-    assign.command_id = command.id;
-    assign.user_id = interaction.user.id;
-    if (!assign.insert()) {
+    // Create assignee
+    const assign: CommandAssignee | null | undefined = assignUser(
+        command,
+        interaction.user.id,
+    );
+    if (assign === undefined) {
         await interaction.editReply("Vous êtes déjà sur cette commande.");
         return;
+    } else if (!assign) {
+        await interaction.editReply("Something went wrong");
+        return;
+    } else {
+        thread.members.add(interaction.user).catch(console.log);
     }
-
-    thread.members.add(interaction.user).catch(console.log);
 
     const embed = getPanelEmbed(command);
 
@@ -1310,27 +1338,12 @@ async function claimHandler(interaction: ButtonInteraction, config: Config) {
 }
 
 async function addItemsSend(interaction: ButtonInteraction, config: Config) {
-    const command = new Command();
-    command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
-        await interaction.reply({
-            content:
-                "Erreur de Database, pas réussi à enregistrer l'interaction.",
-            flags: MessageFlags.Ephemeral,
-        });
-        return;
-    }
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
+    // cannot defer since we want to show modal
+    // await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    if (
-        interaction.user.id !== command.author_id &&
-        !config.admins?.includes(interaction.user.id)
-    ) {
-        await interaction.reply({
-            content: "Cette commande ne vous appartient pas.",
-            flags: MessageFlags.Ephemeral,
-        });
-        return;
-    }
+    const command: Command | null = await getCommand(interaction, config, {deferred: false});
+    if (!command) return;
 
     // Create modal
     const modal = new ModalBuilder()
@@ -1735,23 +1748,20 @@ async function updateItem(
 }
 
 async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
-    const commandId = interaction.customId.split("|")[3];
     const itemId = interaction.customId.split("|")[4];
 
-    const command = new Command();
-    command.id = commandId;
+    const command: Command | null = await getCommand(interaction, config, {
+        checkOwnership: false,
+    });
+    if (!command) return;
 
     const item = new CommandItem();
     item.id = itemId;
 
-    if (!command.sync() || !item.sync()) {
-        interaction
-            .reply({
-                content:
-                    "Erreur de Database, pas réussi à enregistrer l'interaction.",
-                flags: MessageFlags.Ephemeral,
-            })
-            .catch(console.log);
+    if (!item.sync()) {
+        await interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
         return;
     }
 
@@ -1765,6 +1775,7 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
+    // FIXME: replace with auto-assignment
     if (
         interaction.user.id !== command.author_id &&
         !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
@@ -1889,23 +1900,19 @@ async function advanceItemHandler(
 }
 
 async function reserveItemSend(interaction: ButtonInteraction, config: Config) {
-    const commandId = interaction.customId.split("|")[3];
     const itemId = interaction.customId.split("|")[4];
 
-    const command = new Command();
-    command.id = commandId;
-
+    const command: Command | null = await getCommand(interaction, config, {
+        checkOwnership: false,
+    });
+    if (!command) return;
     const item = new CommandItem();
     item.id = itemId;
 
-    if (!command.sync() || !item.sync()) {
-        interaction
-            .reply({
-                content:
-                    "Erreur de Database, pas réussi à enregistrer l'interaction.",
-                flags: MessageFlags.Ephemeral,
-            })
-            .catch(console.log);
+    if (!item.sync()) {
+        await interaction.editReply(
+            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+        );
         return;
     }
 
@@ -1918,6 +1925,8 @@ async function reserveItemSend(interaction: ButtonInteraction, config: Config) {
             .catch(console.log);
         return;
     }
+
+    // FIXME: add auto-assign of the member here
 
     const modal = new ModalBuilder()
         .setCustomId(
@@ -2037,13 +2046,15 @@ async function reserveItemHandler(
 // Confirm before completing item
 async function completeItemHandler(
     interaction: ButtonInteraction,
-    _config: Config,
+    config: Config,
 ) {
+    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const commandId = interaction.customId.split("|")[3];
-    const itemId = interaction.customId.split("|")[4];
+    const command: Command | null = await getCommand(interaction, config);
+    if (!command) return;
 
+    const itemId = interaction.customId.split("|")[4];
     const item: CommandItem | null = CommandItem.get({
         keys: "id",
         values: itemId,
@@ -2055,8 +2066,10 @@ async function completeItemHandler(
         return;
     }
 
+    // FIXME: add auto-assign of user here
+
     const confirmBut = new ButtonBuilder()
-        .setCustomId(`|commander|completeItemConfirm|${commandId}|${itemId}`)
+        .setCustomId(`|commander|completeItemConfirm|${command.id}|${itemId}`)
         .setLabel("Oui")
         .setStyle(ButtonStyle.Success);
 
@@ -2076,7 +2089,6 @@ async function completeItemConfirm(
     config: Config,
 ) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
