@@ -229,6 +229,9 @@ function assignUser(
     // Try to insert in DB
     if (!assign.insert()) return null;
 
+    // Log assignment
+    CommandContribution.log(command, "Got assigned to the command by participating.", userId);
+
     // return result
     return assign;
 }
@@ -246,37 +249,49 @@ function isOwner(
     );
 }
 
+/**
+ * Retrieves the Command object from the DB, if any.
+ * Performs additional security check if necessary.
+ * @param interaction The discord {@link interaction} containing the command ID.
+ * @param config The bot configuration. Useful for {@link adminBypass}.
+ * @param options
+ */
 async function getCommand(
     interaction: MessageComponentInteraction,
     config: Config,
-    options: { checkOwnership?: boolean; adminBypass?: boolean; deferred?: boolean } = {
+    options: {
+        checkOwnership?: boolean;
+        adminBypass?: boolean;
+        deferred?: boolean;
+        additionalCheck?: boolean;
+    } = {
         checkOwnership: true,
         adminBypass: true,
         deferred: true,
+        additionalCheck: false, // WARNING: this is to be able to add a manual override
     },
 ): Promise<Command | null> {
     // Retrieve command from db
     const command = new Command();
     command.id = interaction.customId.split("|")[3];
     if (!command.sync()) {
-        const msg: string = "Erreur de Database, pas réussi à enregistrer l'interaction.;
-        if (options.deferred)
-            await interaction.editReply(msg);
-        else
-            await interaction.reply(msg);
+        const msg: string =
+            "Erreur de Database, pas réussi à enregistrer l'interaction.";
+        if (options.deferred) await interaction.editReply(msg);
+        else await interaction.reply(msg);
         return null;
     }
 
     // Check for ownership, if necessary
     if (
         options.checkOwnership &&
-        !isOwner(command, interaction.user.id, config, options.adminBypass)
+        !isOwner(command, interaction.user.id, config, options.adminBypass) &&
+        // the manual override will prevent from entering here if not allowed
+        !options.additionalCheck
     ) {
-        const msg: string = "Cette commande ne vous appartient pas!";
-        if (options.deferred)
-            await interaction.editReply(msg);
-        else
-            await interaction.reply(msg);
+        const msg: string = "Vous n'avez pas le droit de faire cette action!";
+        if (options.deferred) await interaction.editReply(msg);
+        else await interaction.reply(msg);
         return null;
     }
 
@@ -1099,11 +1114,33 @@ async function assignHandler(
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
 
-    const command = new Command();
-    command.id = interaction.customId.split("|")[3];
-    if (!command.sync()) {
+    // deferred to later
+    const command: Command | null = await getCommand(interaction, config, {
+        checkOwnership: false,
+    });
+    if (!command) return;
+
+    // We need the command to actually check if allowed or not
+    // MAYBE: also search with provided commannd professions
+    const keys = ["user_id", "guild_id", "coordinator"];
+    const values: (number | string | bigint | boolean)[] = [
+        interaction.user.id,
+        interaction.guildId!,
+        true,
+    ];
+    if (command.settlement_id) {
+        keys.push("settlement_id");
+        values.push(command.settlement_id);
+    }
+    if (
+        !isOwner(command, interaction.user.id, config) &&
+        !Fournisseur.get({
+            keys: keys,
+            values: values,
+        })
+    ) {
         await interaction.editReply(
-            "Erreur de Database, pas réussi à enregistrer l'interaction.",
+            "Vous n'avez pas le droit de faire cette action !",
         );
         return;
     }
@@ -1121,30 +1158,6 @@ async function assignHandler(
     if (!chan) {
         await interaction.editReply(
             "Le salon de commandes n'a pas été setup ! Veuillez d'abord utiliser `/setup_commandes` si vous êtes admin, ou contacter un admin.",
-        );
-        return;
-    }
-
-    // MAYBE: also search with provided commannd professions
-    const keys = ["user_id", "guild_id", "coordinator"];
-    const values: (number | string | bigint | boolean)[] = [
-        interaction.user.id,
-        interaction.guildId!,
-        true,
-    ];
-    if (command.settlement_id) {
-        keys.push("settlement_id");
-        values.push(command.settlement_id);
-    }
-    if (
-        !config.admins?.includes(interaction.user.id) &&
-        !Fournisseur.get({
-            keys: keys,
-            values: values,
-        })
-    ) {
-        await interaction.editReply(
-            "Vous n'avez pas le droit de faire cette action !",
         );
         return;
     }
@@ -1342,7 +1355,9 @@ async function addItemsSend(interaction: ButtonInteraction, config: Config) {
     // cannot defer since we want to show modal
     // await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const command: Command | null = await getCommand(interaction, config, {deferred: false});
+    const command: Command | null = await getCommand(interaction, config, {
+        deferred: false,
+    });
     if (!command) return;
 
     // Create modal
