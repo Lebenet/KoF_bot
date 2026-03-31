@@ -1775,22 +1775,23 @@ async function advanceItemSend(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
-    // FIXME: replace with auto-assignment
-    if (
-        interaction.user.id !== command.author_id &&
-        !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
-            .map((a) => a.user_id)
-            .includes(interaction.user.id) &&
-        !config.admins?.includes(interaction.user.id)
-    ) {
-        interaction
-            .reply({
-                content: "Cette commande ne vous appartient pas.",
-                flags: MessageFlags.Ephemeral,
-            })
-            .catch(console.log);
-        return;
-    }
+    // replace assigned-check with auto-assignment
+    // MOVED TO HANDLER INSTEAD OF SENDER
+    // if (
+    //     interaction.user.id !== command.author_id &&
+    //     !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
+    //         .map((a) => a.user_id)
+    //         .includes(interaction.user.id) &&
+    //     !config.admins?.includes(interaction.user.id)
+    // ) {
+    //     interaction
+    //         .reply({
+    //             content: "Cette commande ne vous appartient pas.",
+    //             flags: MessageFlags.Ephemeral,
+    //         })
+    //         .catch(console.log);
+    //     return;
+    // }
 
     const modal = new ModalBuilder()
         .setCustomId(
@@ -1829,6 +1830,9 @@ async function advanceItemHandler(
         );
         return;
     }
+
+    // assign user to the command for interacting with the items
+    assignUser(command, interaction.user.id);
 
     const qtyRaw = interaction.fields.getField("quantity");
     if (!qtyRaw.value.trim().match(/^(?=.*\d)[\d\s,_-]+$/)) {
@@ -1894,9 +1898,9 @@ async function advanceItemHandler(
         );
 
     if (item.message_id) await updateItem(command, item, config);
-    if (command.panel_message_id) updatePanel(command, config);
+    if (command.panel_message_id) await updatePanel(command, config);
 
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 async function reserveItemSend(interaction: ButtonInteraction, config: Config) {
@@ -1926,7 +1930,7 @@ async function reserveItemSend(interaction: ButtonInteraction, config: Config) {
         return;
     }
 
-    // FIXME: add auto-assign of the member here
+    // Note: user assignment moved to the handler
 
     const modal = new ModalBuilder()
         .setCustomId(
@@ -1965,6 +1969,9 @@ async function reserveItemHandler(
         );
         return;
     }
+
+    // assign user to the command for interacting with the items
+    assignUser(command, interaction.user.id);
 
     const qtyRaw = interaction.fields.getField("quantity");
     User.ensureUserExists(interaction.user.id, interaction.user.displayName);
@@ -2039,8 +2046,9 @@ async function reserveItemHandler(
     );
 
     if (item.message_id) await updateItem(command, item, config);
+    if (command.panel_message_id) await updatePanel(command, config);
 
-    interaction.deleteReply();
+    await interaction.deleteReply();
 }
 
 // Confirm before completing item
@@ -2066,7 +2074,7 @@ async function completeItemHandler(
         return;
     }
 
-    // FIXME: add auto-assign of user here
+    // Note: auto-assignment moved to the confirm handler
 
     const confirmBut = new ButtonBuilder()
         .setCustomId(`|commander|completeItemConfirm|${command.id}|${itemId}`)
@@ -2108,16 +2116,20 @@ async function completeItemConfirm(
         return;
     }
 
-    if (
-        interaction.user.id !== command.author_id &&
-        !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
-            .map((a) => a.user_id)
-            .includes(interaction.user.id) &&
-        !config.admins?.includes(interaction.user.id)
-    ) {
-        await interaction.editReply("Cette commande ne vous appartient pas.");
-        return;
-    }
+    // assign user to the command for interacting with the items
+    assignUser(command, interaction.user.id);
+
+    // auto-assignment above replaces this
+    // if (
+    //     interaction.user.id !== command.author_id &&
+    //     !CommandAssignee.fetchArray({ keys: "command_id", values: command.id })
+    //         .map((a) => a.user_id)
+    //         .includes(interaction.user.id) &&
+    //     !config.admins?.includes(interaction.user.id)
+    // ) {
+    //     await interaction.editReply("Cette commande ne vous appartient pas.");
+    //     return;
+    // }
 
     item.progress = item.quantity;
     if (!item.update()) {
@@ -2132,6 +2144,7 @@ async function completeItemConfirm(
 
     // update panel and recap
     if (item.message_id) await updateItem(command, item, config);
+    if (command.panel_message_id) await updatePanel(command, config);
     // remove the original ephemeral message
     await interaction.webhook.deleteMessage(interaction.message.id);
     // remove the awaited answer
