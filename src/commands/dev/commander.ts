@@ -182,7 +182,12 @@ function generateCommandReport(
             )
             .map(
                 (log) =>
-                    `[${log.timestamp}]: ${User.get({ keys: "id", values: log.user_id })?.username ?? "Unknown user"} (${log.user_id}): ${log.action}`,
+                    `[${log.timestamp}]: ${
+                        User.get({
+                            keys: "id",
+                            values: log.user_id,
+                        })?.username ?? "Unknown user"
+                    } (${log.user_id}): ${log.action}`,
             )
             .join("\n") + "\n",
     );
@@ -230,7 +235,11 @@ function assignUser(
     if (!assign.insert()) return null;
 
     // Log assignment
-    CommandContribution.log(command, "Got assigned to the command by participating.", userId);
+    CommandContribution.log(
+        command,
+        "Got assigned to the command by participating.",
+        userId,
+    );
 
     // return result
     return assign;
@@ -923,20 +932,23 @@ async function closeHandler(interaction: ButtonInteraction, config: Config) {
     const thread = interaction.channel as ThreadChannel;
     await thread.delete();
 
-    const msg = await interaction.user.send("Commande supprimée avec succès");
+    const msg = await interaction.user.send({
+        content: "Commande supprimée avec succès",
+        files: [reportFilepath],
+    });
 
-    setTimeout(
-        () =>
-            msg
-                .delete()
-                .catch((err) =>
-                    console.error(
-                        `[ERROR] Couldn't delete message send to ${interaction.user.username}:\n`,
-                        err,
-                    ),
-                ),
-        5_000,
-    );
+    // setTimeout(
+    //     () =>
+    //         msg
+    //             .delete()
+    //             .catch((err) =>
+    //                 console.error(
+    //                     `[ERROR] Couldn't delete message send to ${interaction.user.username}:\n`,
+    //                     err,
+    //                 ),
+    //             ),
+    //     5_000,
+    // );
 }
 
 async function readyHandler(interaction: ButtonInteraction, config: Config) {
