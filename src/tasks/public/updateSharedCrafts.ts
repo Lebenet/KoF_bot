@@ -2,6 +2,7 @@ import {
     ChannelManager,
     ChannelType,
     EmbedBuilder,
+    AttachmentBuilder,
     HexColorString,
     Message,
 } from "discord.js";
@@ -237,6 +238,37 @@ async function update(_data: TaskData, config: Config) {
             dbcraft.total = craft.totalActionsRequired;
             dbcraft.owner_name = craft.ownerUsername;
 
+            // create the url to fetch the icon webp from github
+            const iconUrl: string | null = item
+                ? `https://raw.githubusercontent.com/BitCraftToolBox/BitCraft_Assets/refs/heads/main/sprites/GeneratedIcons/${item.iconAssetName
+                      //.replace(
+                      //    /\/?GeneratedIcons\/Other\/GeneratedIcons/,
+                      //    "GeneratedIcons/Other",
+                      //)
+                      // wtf is this for? idk but it's staying i guess
+                      // i hate myself for not commenting on this but it looks important
+                      .replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/, "$1")
+                      .replaceAll(/\s/g, "")}.webp`
+                : null;
+            // fetch the image and store it in memopry
+            const response: Response | null = iconUrl
+                ? await fetch(iconUrl, {
+                      headers: {
+                          Authorization: `token ${process.env.GITHUB_TOKEN}`,
+                          Accept: "application/vnd.github.v3.raw",
+                      },
+                  })
+                : null;
+            const arrayBuffer: ArrayBuffer | undefined =
+                await response?.arrayBuffer();
+            const buffer: Buffer | null = arrayBuffer
+                ? Buffer.from(arrayBuffer)
+                : null;
+            const attachment: AttachmentBuilder | null = buffer
+                ? new AttachmentBuilder(buffer, { name: "thumbnail.webp" })
+                : null;
+
+            // create the craft message
             const msg = {
                 content: "",
                 embeds: [
@@ -250,24 +282,17 @@ async function update(_data: TaskData, config: Config) {
                             ?.includes(craft.ownerEntityId)
                             ? config.bot.user?.displayAvatarURL()
                             : undefined,
-                    ).setThumbnail(
-                        item
-                            ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName
-                                  .replace(
-                                      /\/?GeneratedIcons\/Other\/GeneratedIcons/,
-                                      "GeneratedIcons/Other",
-                                  )
-                                  .replace(
-                                      /\/?(?:GeneratedIcons)?\/?([^\.]+).*$/,
-                                      "$1",
-                                  )
-                                  .replaceAll(/\s/g, "")}.webp`
-                            : null,
-                    ),
+                    ).setThumbnail("attachment://thumbnail.webp"),
                 ],
+                files: attachment ? [attachment] : [],
             };
-            // console.log(item?.iconAssetName ?? "no item ?");
-            // console.log(item ? `https://raw.githubusercontent.com/BitCraftToolBox/brico/refs/heads/main/frontend/public/assets/GeneratedIcons/${item.iconAssetName.replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/,"$1")}.webp` : "no item ?");
+
+            // debug
+            //console.log(item?.iconAssetName ?? "no item ?");
+            //console.log(iconUrl);
+            //console.log(response?.status, response?.statusText);
+            //console.log(msg.embeds[0]);
+            // console.log(item ? `https://raw.githubusercontent.com/BitCraftToolBox/BitCraft_Assets/refs/heads/main/sprites/GeneratedIcons/${item.iconAssetName.replace(/\/?(?:GeneratedIcons)?\/?([^\.]+).*$/,"$1")}.webp` : "no item ?");
 
             if (message) {
                 if (dbcraft._inserted && !dbcraft.update()) return;
